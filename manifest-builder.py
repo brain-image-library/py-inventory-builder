@@ -189,7 +189,6 @@ warnings.filterwarnings("ignore")
 
 pprint("Computing md5 checksum")
 
-
 def compute_md5sum(filename):
     # BUF_SIZE is totally arbitrary, change for your app!
     BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
@@ -268,7 +267,6 @@ warnings.filterwarnings("ignore")
 
 pprint("Computing sha256 checksum")
 
-
 def compute_sha256sum(filename):
     # BUF_SIZE is totally arbitrary, change for your app!
     BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
@@ -339,79 +337,11 @@ if Path(temp_directory + output_filename).exists():
     shutil.copyfile(temp_directory + output_filename, output_filename)
     Path(temp_directory + output_filename).unlink()
 
-pprint("Compute image size")
-import shutil
-import warnings
-
-warnings.filterwarnings("ignore")
-
-
-def get_image_size(filename):
-    if Path(filename).exists():
-        img = Image.open(filename)
-        return img.size
-    else:
-        return None
-
-
-def __update_dataframe(dataset, chunk):
-    for index, datum in chunk.iterrows():
-        dataset.loc[index, "dimensions"] = chunk.loc[index, "dimensions"]
-
-
-def __get_chunk_size(dataframe):
-    if len(dataframe) < 1000:
-        return 10
-    elif len(dataframe) < 10000:
-        return 100
-    elif len(dataframe) < 100000:
-        return 1000
-    elif len(dataframe) < 500000:
-        return 5000
-    else:
-        return 1000
-
-
-if len(df) < 100:
-    df["dimensions"] = df["fullpath"].parallel_apply(get_image_size)
-    df.to_csv(output_filename, sep="\t", index=False)
-else:
-    if "dimensions" in df.keys():
-        files = df[df["filetype"] == "image"]
-        files = df[df["dimensions"].isnull()]
-    else:
-        files = df
-        files = df[df["filetype"] == "image"]
-
-    if len(files) != 0:
-        n = __get_chunk_size(files)
-        print(f"\nNumber of files to process is {str(len(files))}")
-        chunks = np.array_split(files, n)
-
-        chunk_counter = 1
-        for chunk in chunks:
-            print(f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}")
-            chunk["dimensions"] = chunk["fullpath"].parallel_apply(get_image_size)
-            __update_dataframe(df, chunk)
-            chunk_counter = chunk_counter + 1
-
-            if chunk_counter % 25 == 0 or chunk_counter == len(chunks):
-                print("\nSaving chunks to disk")
-                df.to_csv(temp_directory + output_filename, sep="\t", index=False)
-    else:
-        print("No files left to process")
-
-if Path(temp_directory + output_filename).exists():
-    shutil.copyfile(temp_directory + output_filename, output_filename)
-    Path(temp_directory + output_filename).unlink()
-
 pprint("Computing dataset level statistics")
 import humanize
 
-
 def get_url(filename):
     return filename.replace("/bil/data/", "https://download.brainimagelibrary.org/")
-
 
 from numpyencoder import NumpyEncoder
 

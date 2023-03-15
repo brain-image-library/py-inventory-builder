@@ -65,8 +65,10 @@ if Path(temp_directory + output_filename).exists():
     shutil.copyfile(temp_directory + output_filename, output_filename)
 
 if Path(output_filename).exists():
+    print(f"Found temporary file {output_filename}. Loading local file.")
     df = pd.read_csv(output_filename, sep="\t", low_memory=False)
 else:
+    print(f"Finding all files in {directory}.")
     files = [
         x
         for x in Path(directory).glob("**/*")

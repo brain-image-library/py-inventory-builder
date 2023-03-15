@@ -5,6 +5,7 @@ import json
 import os
 import os.path
 import shutil
+import time
 import uuid
 import warnings
 from pathlib import Path
@@ -40,14 +41,14 @@ pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 if directory[-1] == "/":
     directory = directory[:-1]
 
-if Path(directory).exists():
-    exit
-
 if not Path(".data").exists():
     Path(".data").mkdir()
 
+if not Path("json").exists():
+    Path("json").mkdir()
+
 file = directory.replace("/", "_")
-output_filename = file + ".tsv"
+output_filename = ".data/" + file + ".tsv"
 
 temp_directory = "/scratch/icaoberg/"
 if not Path(temp_directory).exists():
@@ -106,15 +107,20 @@ def get_filetype(extension):
         ".tif",
         ".ome.tif",
         ".jpeg",
+        ".ims",
         ".gif",
         ".ome.tiff",
         "jpg",
         ".jp2",
     }
+
     if extension in images:
         return "images"
-    else:
-        return "other"
+
+    if extension == ".swc":
+        return "tracing"
+
+    return "other"
 
 
 if "filetype" not in df.keys():
@@ -418,10 +424,18 @@ def generate_dataset_uuid(directory):
 
 
 def get_directory_creation_date(directory):
-    ti_c = os.path.getctime(path)
+    ti_c = os.path.getctime(directory)
     c_ti = time.ctime(ti_c)
+
     return c_ti
 
+from urllib import request
+remote_url = 'https://submit.brainimagelibrary.org/search/summarymetadata'
+local_file = '/tmp/summarymetadata.csv'
+
+if Path(local_file).exists():
+	Path(local_file).unlink()
+request.urlretrieve(remote_url, local_file)
 
 dataset = {}
 dataset["dataset_uuid"] = generate_dataset_uuid(directory)
@@ -432,13 +446,22 @@ dataset["number_of_files"] = len(df)
 dataset["size"] = df["size"].sum()
 dataset["pretty_size"] = humanize.naturalsize(dataset["size"], gnu=True)
 dataset["frequencies"] = df["extension"].value_counts().to_dict()
+dataset["file_types"] = df["filetype"].value_counts().to_dict()
 
+metadata = pd.read_csv(local_file,sep=',')
+if not metadata[metadata['bildirectory']==directory].empty:
+    dataset["modality"] = metadata[metadata['bildirectory']==directory]['generalmodality'].values[0]
+    dataset["affiliation"] = metadata[metadata['bildirectory']==directory]['affiliation'].values[0]
+    dataset["metadata_version"] = metadata[metadata['bildirectory']==directory]['metadata_version'].values[0]
+    dataset["title"] = metadata[metadata['bildirectory']==directory]['title'].values[0]
+
+print(dataset)
 
 df["fullpath"] = df["fullpath"].astype(str)
 files = df.to_dict("records")
 dataset["manifest"] = files
 
-output_filename = generate_dataset_uuid(directory) + ".json"
+output_filename = "json/" + generate_dataset_uuid(directory) + ".json"
 with open(output_filename, "w") as ofile:
     json.dump(
         dataset, ofile, indent=4, sort_keys=True, ensure_ascii=False, cls=NumpyEncoder

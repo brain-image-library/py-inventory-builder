@@ -107,6 +107,20 @@ if "filename" not in df.keys():
     df.to_csv(output_filename, sep="\t", index=False)
 
 ###############################################################################################################
+pprint("Get relative path")
+
+
+def get_relative_path(full_path):
+    answer = str(full_path).replace(f"{directory}/", "")
+    return answer
+
+
+if "relativepath" not in df.keys():
+    print("\nComputing relative paths")
+    df["relativepath"] = df["fullpath"].parallel_apply(get_relative_path)
+    df.to_csv(output_filename, sep="\t", index=False)
+
+###############################################################################################################
 pprint("Get file type")
 
 

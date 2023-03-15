@@ -28,6 +28,13 @@ def pprint(msg):
     print(result)
 
 
+def __update_dataframe(dataset, temp, key):
+    for index, datum in temp.iterrows():
+        dataset.loc[index, key] = temp.loc[index, key]
+    return dataset
+
+
+###############################################################################################################
 # Load file with files on directory
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--directory", dest="directory", help="Directory")
@@ -68,6 +75,7 @@ else:
     df = pd.DataFrame()
     df["fullpath"] = files
 
+###############################################################################################################
 pprint("Get file extensions")
 
 
@@ -86,6 +94,7 @@ if "extension" not in df.keys():
     df["extension"] = df["fullpath"].parallel_apply(get_file_extension)
     df.to_csv(output_filename, sep="\t", index=False)
 
+###############################################################################################################
 pprint("Get filename")
 
 
@@ -97,6 +106,7 @@ if "filename" not in df.keys():
     df["filename"] = df["fullpath"].parallel_apply(get_filename)
     df.to_csv(output_filename, sep="\t", index=False)
 
+###############################################################################################################
 pprint("Get file type")
 
 
@@ -128,6 +138,7 @@ if "filetype" not in df.keys():
     df["filetype"] = df["extension"].parallel_apply(get_filetype)
     df.to_csv(output_filename, sep="\t", index=False)
 
+###############################################################################################################
 pprint("Get file creation date")
 
 
@@ -141,6 +152,7 @@ if "modification_time" not in df.keys():
     df["modification_time"] = df["fullpath"].parallel_apply(get_file_creation_date)
     df.to_csv(output_filename, sep="\t", index=False)
 
+###############################################################################################################
 pprint("Get file size")
 
 
@@ -167,6 +179,7 @@ if "mime-type" not in df.keys():
     df["mime-type"] = df["fullpath"].parallel_apply(get_mime_type)
     df.to_csv(output_filename, sep="\t", index=False)
 
+###############################################################################################################
 pprint("Get download link for each file")
 
 
@@ -187,10 +200,15 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-pprint("Computing md5 checksum")
+###############################################################################################################
+pprint("Computing MD5 checksum")
+
+import warnings
+
+warnings.filterwarnings("ignore")
 
 
-def compute_md5sum(filename):
+def __compute_md5sum(filename):
     # BUF_SIZE is totally arbitrary, change for your app!
     BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
 
@@ -207,27 +225,30 @@ def compute_md5sum(filename):
     return md5.hexdigest()
 
 
-def __update_dataframe(dataset, chunk):
-    for index, datum in chunk.iterrows():
-        dataset.loc[index, "md5"] = chunk.loc[index, "md5"]
-
-
 def __get_chunk_size(dataframe):
     if len(dataframe) < 1000:
         return 10
     elif len(dataframe) < 10000:
-        return 250
-    elif len(dataframe) < 100000:
         return 100
+    elif len(dataframe) < 100000:
+        return 250
     elif len(dataframe) < 500000:
-        return 5000
+        return 500
     else:
-        return 1000
+        return 500
 
 
 if len(df) < 100:
-    df["md5"] = df["fullpath"].parallel_apply(compute_md5sum)
-    df.to_csv(output_filename, sep="\t", index=False)
+    if "md5" in df.keys():
+        files = df[df["md5"].isnull()]
+    else:
+        files = df
+    print(f"Number of files to process is {str(len(files))}")
+
+    if len(files) > 0:
+        files["md5"] = files["full_path"].parallel_apply(__compute_md5sum)
+        df = __update_dataframe(df, files, "md5")
+        df.to_csv(output_filename, sep="\t", index=False)
 else:
     if "md5" in df.keys():
         files = df[df["md5"].isnull()]
@@ -236,40 +257,33 @@ else:
 
     if len(files) != 0:
         n = __get_chunk_size(files)
-        print(f"\nNumber of files to process is {str(len(files))}")
+        print(f"Number of files to process is {str(len(files))}")
         if n < 25:
-            df["md5"] = df["fullpath"].parallel_apply(compute_md5sum)
-            df.to_csv(temp_directory + output_filename, sep="\t", index=False)
+            files["md5"] = files["full_path"].parallel_apply(__compute_md5sum)
+            df = __update_dataframe(df, files, "md5")
+            df.to_csv(output_filename, sep="\t", index=False)
         else:
             chunks = np.array_split(files, n)
             chunk_counter = 1
             for chunk in chunks:
                 print(f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}")
-                chunk["md5"] = chunk["fullpath"].parallel_apply(compute_md5sum)
-                __update_dataframe(df, chunk)
+                chunk["md5"] = chunk["full_path"].parallel_apply(__compute_md5sum)
+                df = __update_dataframe(df, chunk, "md5")
                 chunk_counter = chunk_counter + 1
 
                 if chunk_counter % 10 == 0 or chunk_counter == len(chunks):
                     print("\nSaving chunks to disk")
-                    df.to_csv(temp_directory + output_filename, sep="\t", index=False)
+                    df.to_csv(output_filename, sep="\t", index=False)
     else:
         print("No files left to process")
 
-exit
+df.to_csv(output_filename, sep="\t", index=False)
 
-if Path(temp_directory + output_filename).exists():
-    shutil.copyfile(temp_directory + output_filename, output_filename)
-    Path(temp_directory + output_filename).unlink()
-
-import shutil
-import warnings
-
-warnings.filterwarnings("ignore")
-
-pprint("Computing sha256 checksum")
+###############################################################################################################
+pprint("Computing SHA256 checksum")
 
 
-def compute_sha256sum(filename):
+def __compute_sha256sum(filename):
     # BUF_SIZE is totally arbitrary, change for your app!
     BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
 
@@ -285,60 +299,63 @@ def compute_sha256sum(filename):
     return sha256.hexdigest()
 
 
-def __update_dataframe(dataset, chunk):
-    for index, datum in chunk.iterrows():
-        dataset.loc[index, "sha256"] = chunk.loc[index, "sha256"]
-
-
 def __get_chunk_size(dataframe):
     if len(dataframe) < 1000:
         return 10
     elif len(dataframe) < 10000:
         return 100
     elif len(dataframe) < 100000:
-        return 1000
+        return 250
     elif len(dataframe) < 500000:
-        return 5000
+        return 500
     else:
-        return 1000
+        return 500
 
 
 if len(df) < 100:
-    df["sha256"] = df["fullpath"].parallel_apply(compute_sha256sum)
-    df.to_csv(output_filename, sep="\t", index=False)
+    if "sha256" in df.keys():
+        files = df[df["sha256"].isnull()]
+    else:
+        files = df
+    print(f"Number of files to process is {str(len(files))}")
+
+    if len(files) > 0:
+        files["sha256"] = files["full_path"].parallel_apply(__compute_sha256sum)
+        df = __update_dataframe(df, files, "sha256")
+        df.to_csv(output_filename, sep="\t", index=False)
 else:
     if "sha256" in df.keys():
         files = df[df["sha256"].isnull()]
     else:
         files = df
 
-    if len(files) != 0:
+    if not files.empty:
         n = __get_chunk_size(files)
-        print(f"\nNumber of files to process is {str(len(files))}")
+        print(f"Number of files to process is {str(len(files))}")
 
         if n < 25:
-            df["sha256"] = df["fullpath"].parallel_apply(compute_sha256sum)
-            df.to_csv(temp_directory + output_filename, sep="\t", index=False)
+            files["sha256"] = files["full_path"].parallel_apply(__compute_sha256sum)
+            df = __update_dataframe(df, files, "sha256")
+            df.to_csv(output_filename, sep="\t", index=False)
         else:
             chunks = np.array_split(files, n)
 
             chunk_counter = 1
             for chunk in chunks:
                 print(f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}")
-                chunk["sha256"] = chunk["fullpath"].parallel_apply(compute_sha256sum)
-                __update_dataframe(df, chunk)
+                chunk["sha256"] = chunk["full_path"].parallel_apply(__compute_sha256sum)
+                df = __update_dataframe(df, chunk, "sha256")
                 chunk_counter = chunk_counter + 1
 
                 if chunk_counter % 10 == 0 or chunk_counter == len(chunks):
                     print("\nSaving chunks to disk")
-                    df.to_csv(temp_directory + output_filename, sep="\t", index=False)
+                    df.to_csv(output_filename, sep="\t", index=False)
     else:
         print("No files left to process")
 
-if Path(temp_directory + output_filename).exists():
-    shutil.copyfile(temp_directory + output_filename, output_filename)
-    Path(temp_directory + output_filename).unlink()
+df.to_csv(output_filename, sep="\t", index=False)
 
+###############################################################################################################
 pprint("Computing dataset level statistics")
 import humanize
 

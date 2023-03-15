@@ -189,6 +189,7 @@ warnings.filterwarnings("ignore")
 
 pprint("Computing md5 checksum")
 
+
 def compute_md5sum(filename):
     # BUF_SIZE is totally arbitrary, change for your app!
     BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
@@ -267,6 +268,7 @@ warnings.filterwarnings("ignore")
 
 pprint("Computing sha256 checksum")
 
+
 def compute_sha256sum(filename):
     # BUF_SIZE is totally arbitrary, change for your app!
     BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
@@ -340,8 +342,10 @@ if Path(temp_directory + output_filename).exists():
 pprint("Computing dataset level statistics")
 import humanize
 
+
 def get_url(filename):
     return filename.replace("/bil/data/", "https://download.brainimagelibrary.org/")
+
 
 from numpyencoder import NumpyEncoder
 
@@ -359,12 +363,14 @@ def get_directory_creation_date(directory):
 
     return c_ti
 
+
 from urllib import request
-remote_url = 'https://submit.brainimagelibrary.org/search/summarymetadata'
-local_file = '/tmp/summarymetadata.csv'
+
+remote_url = "https://submit.brainimagelibrary.org/search/summarymetadata"
+local_file = "/tmp/summarymetadata.csv"
 
 if Path(local_file).exists():
-	Path(local_file).unlink()
+    Path(local_file).unlink()
 request.urlretrieve(remote_url, local_file)
 
 dataset = {}
@@ -378,12 +384,20 @@ dataset["pretty_size"] = humanize.naturalsize(dataset["size"], gnu=True)
 dataset["frequencies"] = df["extension"].value_counts().to_dict()
 dataset["file_types"] = df["filetype"].value_counts().to_dict()
 
-metadata = pd.read_csv(local_file,sep=',')
-if not metadata[metadata['bildirectory']==directory].empty:
-    dataset["modality"] = metadata[metadata['bildirectory']==directory]['generalmodality'].values[0]
-    dataset["affiliation"] = metadata[metadata['bildirectory']==directory]['affiliation'].values[0]
-    dataset["metadata_version"] = metadata[metadata['bildirectory']==directory]['metadata_version'].values[0]
-    dataset["title"] = metadata[metadata['bildirectory']==directory]['title'].values[0]
+metadata = pd.read_csv(local_file, sep=",")
+if not metadata[metadata["bildirectory"] == directory].empty:
+    dataset["modality"] = metadata[metadata["bildirectory"] == directory][
+        "generalmodality"
+    ].values[0]
+    dataset["affiliation"] = metadata[metadata["bildirectory"] == directory][
+        "affiliation"
+    ].values[0]
+    dataset["metadata_version"] = metadata[metadata["bildirectory"] == directory][
+        "metadata_version"
+    ].values[0]
+    dataset["title"] = metadata[metadata["bildirectory"] == directory]["title"].values[
+        0
+    ]
 
 print(dataset)
 

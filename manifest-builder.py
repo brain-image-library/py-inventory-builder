@@ -95,6 +95,8 @@ if "extension" not in df.keys():
     print("\nComputing file extension")
     df["extension"] = df["fullpath"].parallel_apply(get_file_extension)
     df.to_csv(output_filename, sep="\t", index=False)
+else:
+    print("No files left to process")
 
 ###############################################################################################################
 pprint("Get filename")
@@ -121,6 +123,8 @@ if "relativepath" not in df.keys():
     print("\nComputing relative paths")
     df["relativepath"] = df["fullpath"].parallel_apply(get_relative_path)
     df.to_csv(output_filename, sep="\t", index=False)
+else:
+    print("No files left to process")
 
 ###############################################################################################################
 pprint("Get file type")
@@ -153,6 +157,9 @@ if "filetype" not in df.keys():
     print("\nComputing file type")
     df["filetype"] = df["extension"].parallel_apply(get_filetype)
     df.to_csv(output_filename, sep="\t", index=False)
+else:
+    print("No files left to process")
+
 
 ###############################################################################################################
 pprint("Get file creation date")
@@ -167,6 +174,9 @@ if "modification_time" not in df.keys():
     print("\nComputing modification time")
     df["modification_time"] = df["fullpath"].parallel_apply(get_file_creation_date)
     df.to_csv(output_filename, sep="\t", index=False)
+else:
+    print("No files left to process")
+
 
 ###############################################################################################################
 pprint("Get file size")
@@ -194,6 +204,8 @@ if "mime-type" not in df.keys():
     print("\nComputing mime-type")
     df["mime-type"] = df["fullpath"].parallel_apply(get_mime_type)
     df.to_csv(output_filename, sep="\t", index=False)
+else:
+    print("No files left to process")
 
 ###############################################################################################################
 pprint("Get download link for each file")
@@ -208,20 +220,16 @@ if "download_url" not in df.keys():
     print("\nComputing download URL")
     df["download_url"] = df["fullpath"].parallel_apply(get_url)
     df.to_csv(output_filename, sep="\t", index=False)
-
-import shutil
-
-# Compute md5 checksums
-import warnings
-
-warnings.filterwarnings("ignore")
+else:
+    print("No files left to process")
 
 ###############################################################################################################
-pprint("Computing MD5 checksum")
-
+import shutil
 import warnings
 
 warnings.filterwarnings("ignore")
+
+pprint("Computing MD5 checksum")
 
 
 def __compute_md5sum(filename):

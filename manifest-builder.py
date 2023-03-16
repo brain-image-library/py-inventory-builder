@@ -23,7 +23,7 @@ from tqdm import tqdm
 
 def pprint(msg):
     row = len(msg)
-    h = "".join(["+"] + ["-" * row] + ["+"])
+    h = "".join(["\n+"] + ["-" * row] + ["+"])
     result = h + "\n" "|" + msg + "|" "\n" + h
     print(result)
 

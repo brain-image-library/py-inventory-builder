@@ -187,10 +187,11 @@ def get_file_size(filename):
 
 
 if "size" not in df.keys():
-    print("\Computing file size")
+    print("Computing file size")
     df["size"] = df["fullpath"].parallel_apply(get_file_size)
     df.to_csv(output_filename, sep="\t", index=False)
 
+###############################################################################################################
 pprint("Get mime-type")
 import magic
 

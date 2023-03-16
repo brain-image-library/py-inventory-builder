@@ -262,7 +262,7 @@ if len(df) < 100:
     print(f"Number of files to process is {str(len(files))}")
 
     if len(files) > 0:
-        files["md5"] = files["full_path"].parallel_apply(__compute_md5sum)
+        files["md5"] = files["fullpath"].parallel_apply(__compute_md5sum)
         df = __update_dataframe(df, files, "md5")
         df.to_csv(output_filename, sep="\t", index=False)
 else:
@@ -275,7 +275,7 @@ else:
         n = __get_chunk_size(files)
         print(f"Number of files to process is {str(len(files))}")
         if n < 25:
-            files["md5"] = files["full_path"].parallel_apply(__compute_md5sum)
+            files["md5"] = files["fullpath"].parallel_apply(__compute_md5sum)
             df = __update_dataframe(df, files, "md5")
             df.to_csv(output_filename, sep="\t", index=False)
         else:
@@ -283,7 +283,7 @@ else:
             chunk_counter = 1
             for chunk in chunks:
                 print(f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}")
-                chunk["md5"] = chunk["full_path"].parallel_apply(__compute_md5sum)
+                chunk["md5"] = chunk["fullpath"].parallel_apply(__compute_md5sum)
                 df = __update_dataframe(df, chunk, "md5")
                 chunk_counter = chunk_counter + 1
 
@@ -336,7 +336,7 @@ if len(df) < 100:
     print(f"Number of files to process is {str(len(files))}")
 
     if len(files) > 0:
-        files["sha256"] = files["full_path"].parallel_apply(__compute_sha256sum)
+        files["sha256"] = files["fullpath"].parallel_apply(__compute_sha256sum)
         df = __update_dataframe(df, files, "sha256")
         df.to_csv(output_filename, sep="\t", index=False)
 else:
@@ -350,7 +350,7 @@ else:
         print(f"Number of files to process is {str(len(files))}")
 
         if n < 25:
-            files["sha256"] = files["full_path"].parallel_apply(__compute_sha256sum)
+            files["sha256"] = files["fullpath"].parallel_apply(__compute_sha256sum)
             df = __update_dataframe(df, files, "sha256")
             df.to_csv(output_filename, sep="\t", index=False)
         else:
@@ -359,7 +359,7 @@ else:
             chunk_counter = 1
             for chunk in chunks:
                 print(f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}")
-                chunk["sha256"] = chunk["full_path"].parallel_apply(__compute_sha256sum)
+                chunk["sha256"] = chunk["fullpath"].parallel_apply(__compute_sha256sum)
                 df = __update_dataframe(df, chunk, "sha256")
                 chunk_counter = chunk_counter + 1
 

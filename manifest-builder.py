@@ -1,7 +1,9 @@
+import subprocess
 import argparse
 import datetime
 import hashlib
 import json
+import gzip
 import os
 import os.path
 import shutil
@@ -9,22 +11,23 @@ import time
 import uuid
 import warnings
 from pathlib import Path
-
-import dask.dataframe as dd
+import compress_json
 import numpy as np
 import pandas as pd
 import tabulate
-from dask import delayed
-from joblib import Parallel, delayed
+
+# from dask import delayed
+# from joblib import Parallel, delayed
 from pandarallel import pandarallel
-from PIL import Image
+
+# from PIL import Image
 from tqdm import tqdm
 
 
 def pprint(msg):
     row = len(msg)
-    h = "".join(["\n+"] + ["-" * row] + ["+"])
-    result = h + "\n" "|" + msg + "|" "\n" + h
+    h = "".join(["+"] + ["-" * row] + ["+"])
+    result = "\n" + h + "\n" "|" + msg + "|" "\n" + h
     print(result)
 
 
@@ -34,14 +37,39 @@ def __update_dataframe(dataset, temp, key):
     return dataset
 
 
+def __get_files(directory):
+    files = subprocess.check_output(["lfs", "find", "-type", "f", directory])
+    files = str(files)
+    files = str(files).split("\\n")
+    return files
+
+
+def __get_number_of_files(directory):
+    return len(files)
+
+
 ###############################################################################################################
 # Load file with files on directory
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--directory", dest="directory", help="Directory")
 parser.add_argument("-n", "--number-of-cores", dest="ncores", help="Number of cores")
+parser.add_argument(
+    "--update", action=argparse.BooleanOptionalAction, dest="update", default=False
+)
+parser.add_argument(
+    "--compress", action=argparse.BooleanOptionalAction, dest="compress", default=False
+)
+parser.add_argument(
+    "--avoid-checksums",
+    action=argparse.BooleanOptionalAction,
+    dest="avoid_checksums",
+    default=False,
+)
 args = parser.parse_args()
 directory = args.directory
-
+update_json_file_on_bil_data = bool(args.update)
+compress_json_file_on_bil_data = bool(args.compress)
+avoid_checksums = bool(args.avoid_checksums)
 ncores = int(args.ncores)
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 
@@ -69,11 +97,7 @@ if Path(output_filename).exists():
     df = pd.read_csv(output_filename, sep="\t", low_memory=False)
 else:
     print(f"Finding all files in {directory}.")
-    files = [
-        x
-        for x in Path(directory).glob("**/*")
-        if (x.is_file() or x.is_symlink()) and not x.is_dir()
-    ]
+    files = __get_files(directory)
     df = pd.DataFrame()
     df["fullpath"] = files
 
@@ -92,7 +116,7 @@ def get_file_extension(filename):
 
 
 if "extension" not in df.keys():
-    print("\nComputing file extension")
+    print("Computing file extension")
     df["extension"] = df["fullpath"].parallel_apply(get_file_extension)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
@@ -120,7 +144,7 @@ def get_relative_path(full_path):
 
 
 if "relativepath" not in df.keys():
-    print("\nComputing relative paths")
+    print("Computing relative paths")
     df["relativepath"] = df["fullpath"].parallel_apply(get_relative_path)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
@@ -147,14 +171,15 @@ def get_filetype(extension):
     if extension in images:
         return "images"
 
-    if extension == ".swc":
+    tracings = {".swc", ".marker"}
+    if extension in tracings:
         return "tracing"
 
     return "other"
 
 
 if "filetype" not in df.keys():
-    print("\nComputing file type")
+    print("Computing file type")
     df["filetype"] = df["extension"].parallel_apply(get_filetype)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
@@ -171,7 +196,7 @@ def get_file_creation_date(filename):
 
 
 if "modification_time" not in df.keys():
-    print("\nComputing modification time")
+    print("Computing modification time")
     df["modification_time"] = df["fullpath"].parallel_apply(get_file_creation_date)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
@@ -190,6 +215,8 @@ if "size" not in df.keys():
     print("Computing file size")
     df["size"] = df["fullpath"].parallel_apply(get_file_size)
     df.to_csv(output_filename, sep="\t", index=False)
+else:
+    print("No files left to process")
 
 ###############################################################################################################
 pprint("Get mime-type")
@@ -202,7 +229,7 @@ def get_mime_type(filename):
 
 
 if "mime-type" not in df.keys():
-    print("\nComputing mime-type")
+    print("Computing mime-type")
     df["mime-type"] = df["fullpath"].parallel_apply(get_mime_type)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
@@ -218,7 +245,7 @@ def get_url(filename):
 
 
 if "download_url" not in df.keys():
-    print("\nComputing download URL")
+    print("Computing download URL")
     df["download_url"] = df["fullpath"].parallel_apply(get_url)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
@@ -406,15 +433,6 @@ def get_directory_creation_date(directory):
     return c_ti
 
 
-from urllib import request
-
-remote_url = "https://submit.brainimagelibrary.org/search/summarymetadata"
-local_file = "/tmp/summarymetadata.csv"
-
-if Path(local_file).exists():
-    Path(local_file).unlink()
-request.urlretrieve(remote_url, local_file)
-
 dataset = {}
 dataset["dataset_uuid"] = generate_dataset_uuid(directory)
 dataset["creation_date"] = get_directory_creation_date(directory)
@@ -426,20 +444,52 @@ dataset["pretty_size"] = humanize.naturalsize(dataset["size"], gnu=True)
 dataset["frequencies"] = df["extension"].value_counts().to_dict()
 dataset["file_types"] = df["filetype"].value_counts().to_dict()
 
+local_file = "datasets.csv"
 metadata = pd.read_csv(local_file, sep=",")
-if not metadata[metadata["bildirectory"] == directory].empty:
-    dataset["modality"] = metadata[metadata["bildirectory"] == directory][
+
+
+def __clean_directory(directory):
+    if directory[-1] == "/":
+        directory = directory[:-1]
+    return directory
+
+
+metadata["r24_directory"] = metadata["r24_directory"].apply(__clean_directory)
+
+# status,dataset_uuid,bil_uuid,investigator,collection_id,sample_id,
+# r24_directory,collection_type,method,anatomical_structure,technique,modality,generalmodality,
+# organization_name,lab_name,submission_status,validation_status,project_id,does_r24_exists,is_duplicate
+
+if not metadata[metadata["r24_directory"] == directory].empty:
+    dataset["status"] = "Published"
+
+    dataset["modality"] = metadata[metadata["r24_directory"] == directory][
         "generalmodality"
     ].values[0]
-    dataset["affiliation"] = metadata[metadata["bildirectory"] == directory][
-        "affiliation"
+
+    dataset["organization"] = metadata[metadata["r24_directory"] == directory][
+        "organization_name"
     ].values[0]
-    dataset["metadata_version"] = metadata[metadata["bildirectory"] == directory][
-        "metadata_version"
+
+    dataset["lab"] = metadata[metadata["r24_directory"] == directory][
+        "lab_name"
     ].values[0]
-    dataset["title"] = metadata[metadata["bildirectory"] == directory]["title"].values[
-        0
-    ]
+
+    dataset["anatomical_structure"] = metadata[metadata["r24_directory"] == directory][
+        "anatomical_structure"
+    ].values[0]
+
+    dataset["technique"] = metadata[metadata["r24_directory"] == directory][
+        "technique"
+    ].values[0]
+
+    dataset["submission_id"] = metadata[metadata["r24_directory"] == directory][
+        "bil_uuid"
+    ].values[0]
+
+    dataset["sample_id"] = metadata[metadata["r24_directory"] == directory][
+        "sample_id"
+    ].values[0]
 
 print(dataset)
 
@@ -452,3 +502,32 @@ with open(output_filename, "w") as ofile:
     json.dump(
         dataset, ofile, indent=4, sort_keys=True, ensure_ascii=False, cls=NumpyEncoder
     )
+
+if compress_json_file_on_bil_data:
+    if compress_json_file_on_bil_data:
+        with gzip.open(f"{output_filename}.gz", "wt") as f:
+            f.write(str(dataset))
+
+print(f"Saving results to {output_filename}.")
+
+if update_json_file_on_bil_data:
+    output_filename = (
+        "/bil/data/inventory/" + generate_dataset_uuid(directory) + ".json"
+    )
+    with open(output_filename, "w") as ofile:
+        json.dump(
+            dataset,
+            ofile,
+            indent=4,
+            sort_keys=True,
+            ensure_ascii=False,
+            cls=NumpyEncoder,
+        )
+
+    print(f"Updating file {output_filename}.")
+
+    if compress_json_file_on_bil_data:
+        with gzip.open(f"{output_filename}.gz", "wt") as f:
+            f.write(str(dataset))
+
+print("Done.\n")

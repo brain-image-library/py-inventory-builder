@@ -101,6 +101,8 @@ else:
     df = pd.DataFrame()
     df["fullpath"] = files
 
+df.to_csv(output_filename, sep="\t", index=False)
+
 ###############################################################################################################
 pprint("Get file extensions")
 

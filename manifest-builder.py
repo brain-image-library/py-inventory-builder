@@ -104,7 +104,6 @@ else:
 ###############################################################################################################
 pprint("Get file extensions")
 
-
 def get_file_extension(filename):
     if Path(filename).is_file() or Path(filename).is_symlink():
         extension = Path(filename).suffix
@@ -125,10 +124,8 @@ else:
 ###############################################################################################################
 pprint("Get filename")
 
-
 def get_filename(filename):
     return Path(filename).stem + Path(filename).suffix
-
 
 if "filename" not in df.keys():
     df["filename"] = df["fullpath"].parallel_apply(get_filename)

@@ -40,7 +40,8 @@ def __update_dataframe(dataset, temp, key):
 def __get_files(directory):
     files = subprocess.check_output(["lfs", "find", "-type", "f", directory])
     files = str(files)
-    files = str(files).split("\\n")
+    files = files.replace("b'/bil/data/","/bil/data/")
+    files = files.split("\\n")
     return files
 
 

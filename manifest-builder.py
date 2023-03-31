@@ -15,6 +15,7 @@ import compress_json
 import numpy as np
 import pandas as pd
 import tabulate
+import sys
 
 # from dask import delayed
 # from joblib import Parallel, delayed
@@ -40,8 +41,9 @@ def __update_dataframe(dataset, temp, key):
 def __get_files(directory):
     files = subprocess.check_output(["lfs", "find", "-type", "f", directory])
     files = str(files)
-    files = files.replace("b'/bil/data/","/bil/data/")
+    files = files.replace("b'/bil/data/", "/bil/data/")
     files = files.split("\\n")
+    files = files[:-1]
     return files
 
 
@@ -107,6 +109,7 @@ df.to_csv(output_filename, sep="\t", index=False)
 ###############################################################################################################
 pprint("Get file extensions")
 
+
 def get_file_extension(filename):
     if Path(filename).is_file() or Path(filename).is_symlink():
         extension = Path(filename).suffix
@@ -127,8 +130,10 @@ else:
 ###############################################################################################################
 pprint("Get filename")
 
+
 def get_filename(filename):
     return Path(filename).stem + Path(filename).suffix
+
 
 if "filename" not in df.keys():
     df["filename"] = df["fullpath"].parallel_apply(get_filename)

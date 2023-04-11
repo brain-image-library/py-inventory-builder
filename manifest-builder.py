@@ -226,11 +226,20 @@ else:
 ###############################################################################################################
 pprint("Get mime-type")
 import magic
+import mimetypes
 
 
 def get_mime_type(filename):
     mime = magic.Magic(mime=True)
     return mime.from_file(filename)
+
+
+def get_mime_type(filename):
+    answer = mimetypes.guess_type(filename)
+    try:
+        return answer[0]
+    except:
+        return None
 
 
 if "mime-type" not in df.keys():

@@ -1,21 +1,21 @@
-import subprocess
 import argparse
 import datetime
+import gzip
 import hashlib
 import json
-import gzip
 import os
 import os.path
 import shutil
+import subprocess
 import time
 import uuid
 import warnings
 from pathlib import Path
+
 import compress_json
 import numpy as np
 import pandas as pd
 import tabulate
-import sys
 
 # from dask import delayed
 # from joblib import Parallel, delayed
@@ -225,8 +225,9 @@ else:
 
 ###############################################################################################################
 pprint("Get mime-type")
-import magic
 import mimetypes
+
+import magic
 
 
 def get_mime_type(filename):
@@ -461,8 +462,8 @@ dataset["pretty_size"] = humanize.naturalsize(dataset["size"], gnu=True)
 dataset["frequencies"] = df["extension"].value_counts().to_dict()
 dataset["file_types"] = df["filetype"].value_counts().to_dict()
 
-local_file = "datasets.csv"
-metadata = pd.read_csv(local_file, sep=",")
+local_file = "summarymetadata.tsv"
+metadata = pd.read_csv(local_file, sep="\t")
 
 
 def __clean_directory(directory):
@@ -471,41 +472,41 @@ def __clean_directory(directory):
     return directory
 
 
-metadata["r24_directory"] = metadata["r24_directory"].apply(__clean_directory)
+metadata["bildirectory"] = metadata["bildirectory"].apply(__clean_directory)
 
-# status,dataset_uuid,bil_uuid,investigator,collection_id,sample_id,
-# r24_directory,collection_type,method,anatomical_structure,technique,modality,generalmodality,
-# organization_name,lab_name,submission_status,validation_status,project_id,does_r24_exists,is_duplicate
-
-if not metadata[metadata["r24_directory"] == directory].empty:
+if not metadata[metadata["bildirectory"] == directory].empty:
     dataset["status"] = "Published"
 
-    dataset["modality"] = metadata[metadata["r24_directory"] == directory][
+    dataset["modality"] = metadata[metadata["bildirectory"] == directory][
         "generalmodality"
     ].values[0]
 
-    dataset["organization"] = metadata[metadata["r24_directory"] == directory][
-        "organization_name"
+    dataset["contributor_name"] = metadata[metadata["bildirectory"] == directory][
+        "contributorname"
     ].values[0]
 
-    dataset["lab"] = metadata[metadata["r24_directory"] == directory][
-        "lab_name"
+    dataset["affiliation"] = metadata[metadata["bildirectory"] == directory][
+        "affiliation"
     ].values[0]
 
-    dataset["anatomical_structure"] = metadata[metadata["r24_directory"] == directory][
-        "anatomical_structure"
+    dataset["award_number"] = metadata[metadata["bildirectory"] == directory][
+        "award_number"
     ].values[0]
 
-    dataset["technique"] = metadata[metadata["r24_directory"] == directory][
+    dataset["version"] = metadata[metadata["bildirectory"] == directory][
+        "metadata_version"
+    ].values[0]
+
+    dataset["species"] = metadata[metadata["bildirectory"] == directory][
+        "species"
+    ].values[0]
+
+    dataset["taxonomy"] = metadata[metadata["bildirectory"] == directory][
+        "ncbitaxonomy"
+    ].values[0]
+
+    dataset["technique"] = metadata[metadata["bildirectory"] == directory][
         "technique"
-    ].values[0]
-
-    dataset["submission_id"] = metadata[metadata["r24_directory"] == directory][
-        "bil_uuid"
-    ].values[0]
-
-    dataset["sample_id"] = metadata[metadata["r24_directory"] == directory][
-        "sample_id"
     ].values[0]
 
 print(dataset)

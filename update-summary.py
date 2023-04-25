@@ -1,13 +1,12 @@
-import argparse
-import dask.dataframe as dd
+import uuid
+from datetime import datetime
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
-import tabulate
-import uuid
 import requests
+import tabulate
 from pandarallel import pandarallel
-from datetime import datetime
 
 
 def __pprint(msg):

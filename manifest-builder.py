@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import os.path
+import sys
 import shutil
 import subprocess
 import time
@@ -48,7 +49,7 @@ def __get_files(directory):
 
 
 def __get_number_of_files(directory):
-    return len(files)
+    return len(__get_files(directory))
 
 
 ###############################################################################################################
@@ -63,6 +64,9 @@ parser.add_argument(
     "--compress", action=argparse.BooleanOptionalAction, dest="compress", default=False
 )
 parser.add_argument(
+    "--rebuild", action=argparse.BooleanOptionalAction, dest="rebuild", default=False
+)
+parser.add_argument(
     "--avoid-checksums",
     action=argparse.BooleanOptionalAction,
     dest="avoid_checksums",
@@ -73,6 +77,7 @@ directory = args.directory
 update_json_file_on_bil_data = bool(args.update)
 compress_json_file_on_bil_data = bool(args.compress)
 avoid_checksums = bool(args.avoid_checksums)
+rebuild = bool(args.rebuild)
 ncores = int(args.ncores)
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 
@@ -87,6 +92,11 @@ if not Path("json").exists():
 
 file = directory.replace("/", "_")
 output_filename = ".data/" + file + ".tsv"
+
+if rebuild:
+    if Path(output_filename).exists() or Path(output_filename).is_symlink():
+        print("Rebuilding dataframe. Removing existing TSV file.")
+        Path(output_filename).unlink()
 
 temp_directory = "/scratch/icaoberg/"
 if not Path(temp_directory).exists():
@@ -105,6 +115,12 @@ else:
     df["fullpath"] = files
 
 df.to_csv(output_filename, sep="\t", index=False)
+
+pprint(f"Processing dataset in {directory}")
+
+if df.empty:
+    print(f"No files found in {directory}. Exiting program.")
+    sys.exit()
 
 ###############################################################################################################
 pprint("Get file extensions")
@@ -462,7 +478,7 @@ dataset["pretty_size"] = humanize.naturalsize(dataset["size"], gnu=True)
 dataset["frequencies"] = df["extension"].value_counts().to_dict()
 dataset["file_types"] = df["filetype"].value_counts().to_dict()
 
-local_file = "summarymetadata.tsv"
+local_file = "summary_metadata.tsv"
 metadata = pd.read_csv(local_file, sep="\t")
 
 

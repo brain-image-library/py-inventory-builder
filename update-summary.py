@@ -32,7 +32,7 @@ def __get_files(directory):
 
 
 def __get_number_of_files(directory):
-    return len(files)
+    return len(__get_files(directory))
 
 
 def generate_dataset_uuid(directory):
@@ -71,7 +71,7 @@ def __get_json_file(directory):
 def __get_md5_coverage(directory):
     output_filename = __get_temp_file(directory)
     if output_filename is not None and Path(output_filename).exists():
-        df = pd.read_csv(output_filename, sep="\t")
+        df = pd.read_csv(output_filename, sep="\t", low_memory=False)
         if "md5" in df.keys():
             return (len(df) - df["md5"].isnull().sum()) / len(df)
         else:
@@ -83,7 +83,7 @@ def __get_md5_coverage(directory):
 def __get_sha256_coverage(directory):
     output_filename = __get_temp_file(directory)
     if output_filename is not None and Path(output_filename).exists():
-        df = pd.read_csv(output_filename, sep="\t")
+        df = pd.read_csv(output_filename, sep="\t", low_memory=False)
         if "sha256" in df.keys():
             return (len(df) - df["sha256"].isnull().sum()) / len(df)
         else:
@@ -104,23 +104,23 @@ def __compute_score(datum):
 
 
 ###############################################################################################################
-__pprint(f"Processing summary metadata from brainimagelibrary,org")
+__pprint(f"Processing summary metadata from brainimagelibrary.org")
 url = "https://submit.brainimagelibrary.org/search/summarymetadata"
 temp_file = Path(f"/tmp/summarymetadata.csv")
 
 if temp_file.exists():
     temp_file.unlink()
 
-ncores = 10
+ncores = 5
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 
 response = requests.get(url)
 temp_file.write_bytes(response.content)
 
-df = pd.read_csv(temp_file, sep=",")
-print("Populating dataframe with dataset UUIDs")
+df = pd.read_csv(temp_file, sep=",", low_memory=False)
+print("\nPopulating dataframe with dataset UUIDs")
 df["dataset_uuid"] = df["bildirectory"].parallel_apply(generate_dataset_uuid)
-print("Checking if BIL directory exists")
+print("\nChecking if BIL directory exists")
 df["exists"] = df["bildirectory"].parallel_apply(exists)
 
 df = df[df["exists"] == True]
@@ -153,11 +153,11 @@ df["temp_file"] = df["bildirectory"].parallel_apply(__get_temp_file)
 print("\nComputing json file filename")
 df["json_file"] = df["bildirectory"].parallel_apply(__get_json_file)
 
-# print('\nComputing MD5 coverage')
-# df['md5_coverage'] = df['bildirectory'].parallel_apply(__get_md5_coverage)
+print("\nComputing MD5 coverage")
+df["md5_coverage"] = df["bildirectory"].parallel_apply(__get_md5_coverage)
 
-# print('\nComputing SHA256 coverage')
-# df['sha256_coverage'] = df['bildirectory'].parallel_apply(__get_sha256_coverage)
+print("\nComputing SHA256 coverage")
+df["sha256_coverage"] = df["bildirectory"].parallel_apply(__get_sha256_coverage)
 
 print("\nComputing dataset score")
 for index, datum in df.iterrows():

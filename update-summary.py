@@ -222,9 +222,16 @@ except:
 print("Saving dataframe to disk")
 df.to_csv("summary_metadata.tsv", sep="\t", index=False)
 
+if Path("/bil/data/inventory").exists():
+    now = datetime.now()
+    report_output_directory = "/bil/data/inventory"
+    report_output_filename = (
+        report_output_directory + "/" + str(now.strftime("%Y%m%d")) + ".tsv"
+    )
+    df.to_csv(report_output_filename, sep="\t", index=False)
+
 print("Exporting dataframe to Excel spreadsheet")
 now = datetime.now()
 df.to_excel(
     "summary_metadata.xlsx", sheet_name=str(now.strftime("%Y%m%d")), index=False
 )
-

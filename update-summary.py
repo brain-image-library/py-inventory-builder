@@ -1,6 +1,8 @@
+import subprocess
 import uuid
 from datetime import datetime
 from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
@@ -104,6 +106,19 @@ def __compute_score(datum):
 
 
 ###############################################################################################################
+# Check if backup already
+if Path("/bil/data/inventory").exists():
+    now = datetime.now()
+    report_output_directory = "/bil/data/inventory/daily/reports"
+    report_output_filename = (
+        f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.tsv'
+    )
+    if Path(report_output_filename).exists():
+        print(
+            f"Backup file {report_output_filename} already exists. Skipping computation."
+        )
+        sys.exit()
+
 __pprint(f"Processing summary metadata from brainimagelibrary.org")
 url = "https://submit.brainimagelibrary.org/search/summarymetadata"
 temp_file = Path(f"/tmp/summarymetadata.csv")
@@ -111,13 +126,29 @@ temp_file = Path(f"/tmp/summarymetadata.csv")
 if temp_file.exists():
     temp_file.unlink()
 
-ncores = 5
+ncores = 12
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 
 response = requests.get(url)
 temp_file.write_bytes(response.content)
 
 df = pd.read_csv(temp_file, sep=",", low_memory=False)
+if df.keys()[0] == "<html>":
+    print(f"File is empty. More than likely the submit VM is down.")
+    print(f"Attempting to load backup file, if it exists.")
+    if Path("/bil/data/inventory").exists():
+        now = datetime.now()
+        report_output_directory = "/bil/data/inventory/daily"
+        report_output_filename = (
+            f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.csv'
+        )
+        if Path(report_output_filename).exists():
+            temp_file = report_output_filename
+            df = pd.read_csv(temp_file, sep=",", low_memory=False)
+        else:
+            print(f"Unable to find file {report_output_filename}. Exiting program.")
+            sys.exit()
+
 print("\nPopulating dataframe with dataset UUIDs")
 df["dataset_uuid"] = df["bildirectory"].parallel_apply(generate_dataset_uuid)
 print("\nChecking if BIL directory exists")
@@ -222,13 +253,22 @@ except:
 print("Saving dataframe to disk")
 df.to_csv("summary_metadata.tsv", sep="\t", index=False)
 
+# saves to public directory
 if Path("/bil/data/inventory").exists():
     now = datetime.now()
-    report_output_directory = "/bil/data/inventory"
+    report_output_directory = "/bil/data/inventory/daily/reports"
     report_output_filename = (
-        report_output_directory + "/" + str(now.strftime("%Y%m%d")) + ".tsv"
+        f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.tsv'
     )
     df.to_csv(report_output_filename, sep="\t", index=False)
+
+    symlink_file = f"{report_output_directory}/today.tsv"
+    if Path(symlink_file).exists():
+        Path(symlink_file).unlink()
+
+    command = f"ln -s {report_output_filename} {symlink_file}"
+    print(command)
+    output = subprocess.check_output(command, shell=True)
 
 print("Exporting dataframe to Excel spreadsheet")
 now = datetime.now()

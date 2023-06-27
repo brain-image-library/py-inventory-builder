@@ -126,7 +126,7 @@ temp_file = Path(f"/tmp/summarymetadata.csv")
 if temp_file.exists():
     temp_file.unlink()
 
-ncores = 12
+ncores = 8
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 
 response = requests.get(url)
@@ -255,6 +255,7 @@ df.to_csv("summary_metadata.tsv", sep="\t", index=False)
 
 # saves to public directory
 if Path("/bil/data/inventory").exists():
+    print("Backing up data to /bil/data/inventory")
     now = datetime.now()
     report_output_directory = "/bil/data/inventory/daily/reports"
     report_output_filename = (
@@ -263,6 +264,21 @@ if Path("/bil/data/inventory").exists():
     df.to_csv(report_output_filename, sep="\t", index=False)
 
     symlink_file = f"{report_output_directory}/today.tsv"
+    if Path(symlink_file).exists():
+        Path(symlink_file).unlink()
+
+    command = f"ln -s {report_output_filename} {symlink_file}"
+    print(command)
+    output = subprocess.check_output(command, shell=True)
+
+    now = datetime.now()
+    report_output_directory = "/bil/data/inventory/daily/reports"
+    report_output_filename = (
+        f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.json'
+    )
+    df.to_json(report_output_filename, orient="records", indent=4)
+
+    symlink_file = f"{report_output_directory}/today.json"
     if Path(symlink_file).exists():
         Path(symlink_file).unlink()
 

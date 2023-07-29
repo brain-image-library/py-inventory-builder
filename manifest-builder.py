@@ -52,11 +52,55 @@ def __get_number_of_files(directory):
     return len(__get_files(directory))
 
 
+def __to_json(df, direcotry):
+    df["fullpath"] = df["fullpath"].astype(str)
+    files = df.to_dict("records")
+    dataset["manifest"] = files
+
+    output_filename = "json/" + generate_dataset_uuid(directory) + ".json"
+    with open(output_filename, "w") as ofile:
+        json.dump(
+            dataset,
+            ofile,
+            indent=4,
+            sort_keys=True,
+            ensure_ascii=False,
+            cls=NumpyEncoder,
+        )
+
+    if compress_json_file_on_bil_data:
+        if compress_json_file_on_bil_data:
+            with gzip.open(f"{output_filename}.gz", "wt") as f:
+                f.write(str(dataset))
+
+    print(f"Saving results to {output_filename}.")
+
+    if update_json_file_on_bil_data:
+        output_filename = f"/bil/data/inventory/{generate_dataset_uuid(directory)}.json"
+        with open(output_filename, "w") as ofile:
+            json.dump(
+                dataset,
+                ofile,
+                indent=4,
+                sort_keys=True,
+                ensure_ascii=False,
+                cls=NumpyEncoder,
+            )
+
+    print(f"Updating file {output_filename}.")
+
+    if compress_json_file_on_bil_data:
+        with gzip.open(f"{output_filename}.gz", "wt") as f:
+            f.write(str(dataset))
+
+
 ###############################################################################################################
 # Load file with files on directory
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--directory", dest="directory", help="Directory")
-parser.add_argument("-n", "--number-of-cores", dest="ncores", help="Number of cores")
+parser.add_argument(
+    "-n", "--number-of-cores", dest="ncores", help="Number of cores", default=2
+)
 parser.add_argument(
     "--update", action=argparse.BooleanOptionalAction, dest="update", default=False
 )
@@ -525,43 +569,6 @@ if not metadata[metadata["bildirectory"] == directory].empty:
         "technique"
     ].values[0]
 
-print(dataset)
-
-df["fullpath"] = df["fullpath"].astype(str)
-files = df.to_dict("records")
-dataset["manifest"] = files
-
-output_filename = "json/" + generate_dataset_uuid(directory) + ".json"
-with open(output_filename, "w") as ofile:
-    json.dump(
-        dataset, ofile, indent=4, sort_keys=True, ensure_ascii=False, cls=NumpyEncoder
-    )
-
-if compress_json_file_on_bil_data:
-    if compress_json_file_on_bil_data:
-        with gzip.open(f"{output_filename}.gz", "wt") as f:
-            f.write(str(dataset))
-
-print(f"Saving results to {output_filename}.")
-
-if update_json_file_on_bil_data:
-    output_filename = (
-        "/bil/data/inventory/" + generate_dataset_uuid(directory) + ".json"
-    )
-    with open(output_filename, "w") as ofile:
-        json.dump(
-            dataset,
-            ofile,
-            indent=4,
-            sort_keys=True,
-            ensure_ascii=False,
-            cls=NumpyEncoder,
-        )
-
-    print(f"Updating file {output_filename}.")
-
-    if compress_json_file_on_bil_data:
-        with gzip.open(f"{output_filename}.gz", "wt") as f:
-            f.write(str(dataset))
+__to_json(df, directory)
 
 print("Done.\n")

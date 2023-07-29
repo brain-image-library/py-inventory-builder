@@ -1,8 +1,7 @@
 #!/bin/bash
 #SBATCH -p validation
 #SBATCH -n 25
-#SBATCH -N 1
-#SBATCH --mem=512G
+#SBATCH --mem=50000M
 
 # this is only mean to aid @icaoberg run this as a cronjob
 

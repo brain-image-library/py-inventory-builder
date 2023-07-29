@@ -3,7 +3,8 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 import sys
-
+import json
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import requests
@@ -16,6 +17,44 @@ def __pprint(msg):
     h = "".join(["+"] + ["-" * row] + ["+"])
     result = h + "\n" "|" + msg + "|" "\n" + h
     print(result)
+
+def __get_data(json_file):
+	try:
+		# Open the JSON file
+		with open(json_file, 'r') as file:
+			# Load the JSON data into a dictionary
+			data = json.load(file)
+
+		return data
+	except:
+		return {}
+
+def __get_file_types(data):
+    try:
+        return data["file_types"]
+    except:
+        return None
+
+
+def __get_frequencies(data):
+    try:
+        return data["frequencies"]
+    except:
+        return None
+
+
+def __get_dataset_size(data):
+    try:
+        return data["size"]
+    except:
+        return None
+
+
+def __get_creation_date(data):
+    try:
+        return data["creation_date"]
+    except:
+        return None
 
 
 def __update_dataframe(dataset, temp, key):
@@ -35,7 +74,6 @@ def __get_files(directory):
 
 def __get_number_of_files(directory):
     return len(__get_files(directory))
-
 
 def generate_dataset_uuid(directory):
     if directory[-1] == "/":
@@ -58,7 +96,6 @@ def __get_temp_file(directory):
         return output_filename
     else:
         return None
-
 
 def __get_json_file(directory):
     dataset_uuid = generate_dataset_uuid(directory)
@@ -126,7 +163,7 @@ temp_file = Path(f"/tmp/summarymetadata.csv")
 if temp_file.exists():
     temp_file.unlink()
 
-ncores = 8
+ncores = 25
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 
 response = requests.get(url)
@@ -149,40 +186,40 @@ if df.keys()[0] == "<html>":
             print(f"Unable to find file {report_output_filename}. Exiting program.")
             sys.exit()
 
+##clean dataframe
+if 'title' in df.keys():
+	df = df.drop('title', axis=1)
+
+if 'abstract' in df.keys():
+	df = df.drop('abstract', axis=1)
+
 print("\nPopulating dataframe with dataset UUIDs")
 df["dataset_uuid"] = df["bildirectory"].parallel_apply(generate_dataset_uuid)
 print("\nChecking if BIL directory exists")
 df["exists"] = df["bildirectory"].parallel_apply(exists)
+print("\nComputing json file filename")
+df["json_file"] = df["bildirectory"].parallel_apply(__get_json_file)
 
 df = df[df["exists"] == True]
-df = df[
-    [
-        "metadata_version",
-        "dataset_uuid",
-        "bildirectory",
-        "exists",
-        "project",
-        "is_biccn",
-        "bil_uuid",
-        "contributorname",
-        "affiliation",
-        "award_number",
-        "species",
-        "ncbitaxonomy",
-        "samplelocalid",
-        "genotype",
-        "generalmodality",
-        "technique",
-        "locations",
-        "URL",
-    ]
-]
+
+print('\nGet data from JSON file')
+for index, row in tqdm(df.iterrows()):
+	json_file = df.at[index, 'json_file']
+	data = __get_data(json_file)
+	df.loc[index,"creation_date"] = __get_creation_date(data)
+	df.loc[index,"size"] = __get_dataset_size(data)
+
+print("\nGetting number of files")
+df["number_of_files"] = df["bildirectory"].parallel_apply(__get_number_of_files)
+
+#print("\nGetting file types")
+#df["file_types"] = df["json_file"].parallel_apply(__get_file_types)
+
+#print("\nGetting frequencies")
+#df["frequencies"] = df["json_file"].parallel_apply(__get_frequencies)
 
 print("\nComputing temp file filename")
 df["temp_file"] = df["bildirectory"].parallel_apply(__get_temp_file)
-
-print("\nComputing json file filename")
-df["json_file"] = df["bildirectory"].parallel_apply(__get_json_file)
 
 print("\nComputing MD5 coverage")
 df["md5_coverage"] = df["bildirectory"].parallel_apply(__get_md5_coverage)
@@ -195,60 +232,6 @@ for index, datum in df.iterrows():
     df.loc[index, "score"] = __compute_score(datum)
 
 df = df.sort_values("score")
-try:
-    df = df[
-        [
-            "score",
-            "metadata_version",
-            "dataset_uuid",
-            "bildirectory",
-            "exists",
-            "project",
-            "is_biccn",
-            "bil_uuid",
-            "contributorname",
-            "affiliation",
-            "award_number",
-            "species",
-            "ncbitaxonomy",
-            "samplelocalid",
-            "genotype",
-            "generalmodality",
-            "technique",
-            "locations",
-            "URL",
-            "temp_file",
-            "json_file",
-            "md5_coverage",
-            "sha256_coverage",
-        ]
-    ]
-except:
-    df = df[
-        [
-            "score",
-            "metadata_version",
-            "dataset_uuid",
-            "bildirectory",
-            "exists",
-            "project",
-            "is_biccn",
-            "bil_uuid",
-            "contributorname",
-            "affiliation",
-            "award_number",
-            "species",
-            "ncbitaxonomy",
-            "samplelocalid",
-            "genotype",
-            "generalmodality",
-            "technique",
-            "locations",
-            "URL",
-            "temp_file",
-            "json_file",
-        ]
-    ]
 
 print("Saving dataframe to disk")
 df.to_csv("summary_metadata.tsv", sep="\t", index=False)

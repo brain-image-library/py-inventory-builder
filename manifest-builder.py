@@ -27,6 +27,22 @@ from tqdm import tqdm
 
 
 def pprint(msg):
+    """
+    Pretty-print the given message with horizontal lines above and below.
+
+    Parameters:
+        msg (str): The message to be pretty-printed.
+
+    Returns:
+        None
+
+    Example:
+        >>> pprint("Hello, World!")
+        +-------------+
+        |Hello, World!|
+        +-------------+
+    """
+    
     row = len(msg)
     h = "".join(["+"] + ["-" * row] + ["+"])
     result = "\n" + h + "\n" "|" + msg + "|" "\n" + h

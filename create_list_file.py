@@ -140,11 +140,11 @@ def summarize(file):
     data = __get_metadata(file)
     data["manifest"] = __summarize(file)
 
-    data = data.drop("extension", axis=1)
-    data = data.drop("filetype", axis=1)
-    data = data.drop("mime-type", axis=1)
-    data = data.drop("size", axis=1)
-    data = data.drop("number_of_files", axis=1)
+    del data["extension"]
+    del data["filetype"]
+    del data["mime-type"]
+    del data["size"]
+    del data["number_of_files"]
 
     return data
 

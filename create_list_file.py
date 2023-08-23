@@ -125,6 +125,7 @@ def __get_manifest(file: str) -> Any:
 
 def __summarize(file):
     data = __get_manifest(file)
+    df = pd.DataFrame(data)
 
     summary = {}
     summary["extension"] = df["extension"].value_counts().to_dict()

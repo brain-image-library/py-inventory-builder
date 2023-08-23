@@ -73,14 +73,18 @@ def __get_metadata(file: str) -> Any:
         command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
 
-    with open(temp_file, "r") as file:
-        data = file.read()
-        data = json.loads(data)
+    try:
+        with open(temp_file, "r") as file:
+            data = file.read()
+            data = json.loads(data)
 
-    if Path(temp_file).exists():
-        Path(temp_file).unlink()
+        if Path(temp_file).exists():
+            Path(temp_file).unlink()
 
-    return data
+        return data
+    except:
+        print(temp_file)
+        return {}
 
 
 def __get_manifest(file: str) -> Any:

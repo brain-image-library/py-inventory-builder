@@ -149,7 +149,7 @@ def summarize(file):
     return data
 
 
-files = get_files()
+files = get_files("/bil/data/inventory", "json")
 
 output_directory = "summary"
 if not Path("summary").exists():

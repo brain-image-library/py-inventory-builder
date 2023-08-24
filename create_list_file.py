@@ -182,7 +182,7 @@ def main():
         if Path(output_file).exists():
             Path(output_file).unlink()
 
-        df.to_json(output_file, orient="records", lines=True)
+        df.to_json(output_file, orient="records", indent=4, lines=True)
         # Uncomment the break statement if you want to process only one file
         break
 

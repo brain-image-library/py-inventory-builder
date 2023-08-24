@@ -183,7 +183,7 @@ def main():
 
         df.to_json(output_file, orient="records", lines=True)
         # Uncomment the break statement if you want to process only one file
-        # break
+        break
 
 
 if __name__ == "__main__":

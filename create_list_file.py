@@ -165,6 +165,7 @@ def __summarize(file):
     summary["mime-type"] = df["mime-type"].value_counts().to_dict()
     summary["size"] = int(df["size"].sum())
     summary["pretty_size"] = humanize.naturalsize(int(df["size"].sum()))
+    summary["download_url"] = f"https://download.brainimagelibrary.org/inventory/{file}"
     summary["number_of_files"] = len(df)
 
     return summary

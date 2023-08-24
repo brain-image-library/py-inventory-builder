@@ -154,15 +154,33 @@ def summarize(file):
     return data
 
 
-files = get_files("/bil/data/inventory", "json")
+def main():
+    """
+    Main function to process files and generate summaries.
 
-output_directory = "summary"
-if not Path("summary").exists():
-    Path("summary").mkdir()
+    This function processes each JSON file in the input directory, generates a summary,
+    and saves the summary as a JSON file in the output directory.
+    """
 
-for file in tqdm(files):
-    summary = summarize(file)
-    df = pd.DataFrame(summary)
-    output_file = f"{output_directory}/{file.name}"
-    df.to_json(output_file, orient="records", lines=True)
-    break
+    input_directory = "/bil/data/inventory"
+    output_directory = "summary"
+
+    # Get a list of JSON files
+    files = get_files(input_directory, "json")
+
+    # Create the output directory if it doesn't exist
+    if not Path(output_directory).exists():
+        Path(output_directory).mkdir()
+
+    # Process each file and create summaries
+    for file in tqdm(files):
+        summary = summarize(file)
+        df = pd.DataFrame(summary)
+        output_file = f"{output_directory}/{file.name}"
+        df.to_json(output_file, orient="records", lines=True)
+        # Uncomment the break statement if you want to process only one file
+        # break
+
+
+if __name__ == "__main__":
+    main()

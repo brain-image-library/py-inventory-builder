@@ -8,3 +8,4 @@
 . /bil/users/icaoberg/miniconda3/etc/profile.d/conda.sh
 conda activate base
 python ./update-summary.py
+python ./create_list_file.py

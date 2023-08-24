@@ -129,6 +129,33 @@ def __get_manifest(file: str) -> Any:
 
 
 def __summarize(file):
+    """
+    Summarize the 'manifest' field of a JSON file.
+
+    This function extracts data from the 'manifest' field of a JSON file and generates
+    a summary containing information about file extensions, file types, mime-types,
+    total size, pretty size, and the number of files.
+
+    Parameters:
+        file (str):
+            The path to the input JSON file.
+
+    Returns:
+        dict:
+            A summary dictionary containing information about file extensions, file types,
+            mime-types, total size, pretty size, and the number of files.
+
+    Example:
+        >>> manifest_summary = __summarize("data.json")
+        >>> print(manifest_summary)
+
+    :param file: The path to the input JSON file.
+    :type file: str
+    :return: A summary dictionary containing information about file extensions, file types,
+             mime-types, total size, pretty size, and the number of files.
+    :rtype: dict
+    """
+
     data = __get_manifest(file)
     df = pd.DataFrame(data)
 
@@ -144,6 +171,32 @@ def __summarize(file):
 
 
 def summarize(file):
+    """
+    Summarize the content of a JSON file.
+
+    This function reads the content of a JSON file, extracts metadata and a 'manifest'
+    field, and then performs post-processing to remove specific fields from the summary.
+
+    Parameters:
+        file (str):
+            The path to the input JSON file.
+
+    Returns:
+        dict:
+            A summarized dictionary containing metadata and the 'manifest' field, with
+            certain fields removed.
+
+    Example:
+        >>> summary = summarize("data.json")
+        >>> print(summary)
+
+    :param file: The path to the input JSON file.
+    :type file: str
+    :return: A summarized dictionary containing metadata and the 'manifest' field,
+             with certain fields removed.
+    :rtype: dict
+    """
+
     data = __get_metadata(file)
     data["manifest"] = __summarize(file)
 
@@ -175,9 +228,11 @@ def main():
         Path(output_directory).mkdir()
 
     # Process each file and create summaries
+    summaries = []
     for file in files:
         print(file)
         summary = summarize(file)
+        summaries.append(summary)
         output_file = f"{output_directory}/{file.name}"
 
         if Path(output_file).exists():
@@ -188,6 +243,13 @@ def main():
 
         # Uncomment the break statement if you want to process only one file
         break
+
+    # Specify the path to the output JSON file
+    output_file = f"{output_directory}/list.json"
+
+    # Write the list of dictionaries to the JSON file
+    with open(output_file, "w") as json_file:
+        json.dump(summaries, json_file, indent=4)
 
 
 if __name__ == "__main__":

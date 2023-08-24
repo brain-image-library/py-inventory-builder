@@ -143,6 +143,7 @@ def __summarize(file):
 
 def summarize(file):
     data = __get_metadata(file)
+    del data["manifest"]
     data["manifest"] = __summarize(file)
 
     del data["file_types"]

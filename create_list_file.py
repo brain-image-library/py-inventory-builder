@@ -240,16 +240,19 @@ def main():
     # Process each file and create summaries
     summaries = []
     for file in files:
-        print(file)
-        summary = summarize(file)
-        summaries.append(summary)
-        output_file = f"{output_directory}/{file.name}"
+        if str(file) == "/bil/data/inventory/list.json":
+            print("Ignoring list.json")
+        else:
+            print(file)
+            summary = summarize(file)
+            summaries.append(summary)
+            output_file = f"{output_directory}/{file.name}"
 
-        if Path(output_file).exists():
-            Path(output_file).unlink()
+            if Path(output_file).exists():
+                Path(output_file).unlink()
 
-        with open(output_file, "w") as json_file:
-            json.dump(summary, json_file, indent=4)
+            with open(output_file, "w") as json_file:
+                json.dump(summary, json_file, indent=4)
 
     # Specify the path to the output JSON file
     output_file = f"{output_directory}/list.json"

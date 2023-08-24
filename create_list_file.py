@@ -144,7 +144,6 @@ def __summarize(file):
 def summarize(file):
     data = __get_metadata(file)
     data["manifest"] = __summarize(file)
-    print(data)
 
     del data["file_types"]
     del data["frequencies"]
@@ -152,7 +151,6 @@ def summarize(file):
     del data["pretty_size"]
     del data["number_of_files"]
 
-    print(data)
     return data
 
 
@@ -175,7 +173,8 @@ def main():
         Path(output_directory).mkdir()
 
     # Process each file and create summaries
-    for file in tqdm(files):
+    for file in files:
+        print(file)
         summary = summarize(file)
         df = pd.DataFrame(summary)
         output_file = f"{output_directory}/{file.name}"

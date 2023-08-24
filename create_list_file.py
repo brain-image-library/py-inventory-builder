@@ -41,6 +41,12 @@ def get_files(directory: str, extension: str = "json") -> List[Path]:
     :rtype: List[Path]
     """
     files = list(Path(directory).glob(f"*.{extension}"))
+
+    # Remove the specific item from the list
+    item_to_remove = "/bil/data/inventory/list.json"
+    if item_to_remove in files:
+        files.remove(item_to_remove)
+
     return files
 
 

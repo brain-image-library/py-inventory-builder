@@ -177,6 +177,10 @@ def main():
         summary = summarize(file)
         df = pd.DataFrame(summary)
         output_file = f"{output_directory}/{file.name}"
+
+        if Path(output_file).exists():
+            Path(output_file).unlink()
+
         df.to_json(output_file, orient="records", lines=True)
         # Uncomment the break statement if you want to process only one file
         # break

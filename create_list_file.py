@@ -143,7 +143,6 @@ def __summarize(file):
 
 def summarize(file):
     data = __get_metadata(file)
-    del data["manifest"]
     data["manifest"] = __summarize(file)
 
     del data["file_types"]
@@ -177,13 +176,14 @@ def main():
     for file in files:
         print(file)
         summary = summarize(file)
-        df = pd.DataFrame(summary)
         output_file = f"{output_directory}/{file.name}"
 
         if Path(output_file).exists():
             Path(output_file).unlink()
 
-        df.to_json(output_file, orient="records", indent=4, lines=True)
+        with open(output_file, "w") as json_file:
+            json.dump(summary, json_file, indent=4)
+
         # Uncomment the break statement if you want to process only one file
         break
 

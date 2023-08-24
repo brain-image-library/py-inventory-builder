@@ -136,6 +136,7 @@ def __summarize(file):
     summary["file_type"] = df["filetype"].value_counts().to_dict()
     summary["mime-type"] = df["mime-type"].value_counts().to_dict()
     summary["size"] = int(df["size"].sum())
+    summary["pretty_size"] = humanize.naturalsize(int(df["size"].sum()))
     summary["number_of_files"] = len(df)
 
     return summary

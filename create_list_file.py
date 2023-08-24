@@ -167,7 +167,6 @@ def __summarize(file):
     summary["pretty_size"] = humanize.naturalsize(int(df["size"].sum()))
 
     url = str(file).replace("/bil/data/", "https://download.brainimagelibrary.org/")
-    url = f"{url}/inventory/{Path(file).stem}"
     summary["download_url"] = url
 
     summary["number_of_files"] = len(df)

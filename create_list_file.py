@@ -145,10 +145,10 @@ def summarize(file):
     data = __get_metadata(file)
     data["manifest"] = __summarize(file)
 
-    del data["extension"]
-    del data["filetype"]
-    del data["mime-type"]
+    del data["file_types"]
+    del data["frequencies"]
     del data["size"]
+    del data["pretty_size"]
     del data["number_of_files"]
 
     return data
@@ -164,6 +164,5 @@ for file in tqdm(files):
     summary = summarize(file)
     df = pd.DataFrame(summary)
     output_file = f"{output_directory}/{file.name}"
-    print(output_file)
-    df.to_json(output_file, orient="records", lines=True, escape=False)
+    df.to_json(output_file, orient="records", lines=True)
     break

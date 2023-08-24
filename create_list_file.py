@@ -245,11 +245,15 @@ def main():
         with open(output_file, "w") as json_file:
             json.dump(summary, json_file, indent=4)
 
-        # Uncomment the break statement if you want to process only one file
-        break
-
     # Specify the path to the output JSON file
     output_file = f"{output_directory}/list.json"
+
+    # Write the list of dictionaries to the JSON file
+    with open(output_file, "w") as json_file:
+        json.dump(summaries, json_file, indent=4)
+
+    # Specify the path to the output JSON file
+    output_file = f"/bil/data/inventory/list.json"
 
     # Write the list of dictionaries to the JSON file
     with open(output_file, "w") as json_file:

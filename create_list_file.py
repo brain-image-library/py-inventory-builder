@@ -144,6 +144,7 @@ def __summarize(file):
 def summarize(file):
     data = __get_metadata(file)
     data["manifest"] = __summarize(file)
+    print(data)
 
     del data["file_types"]
     del data["frequencies"]
@@ -151,6 +152,7 @@ def summarize(file):
     del data["pretty_size"]
     del data["number_of_files"]
 
+    print(data)
     return data
 
 

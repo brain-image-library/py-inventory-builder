@@ -42,7 +42,7 @@ def pprint(msg):
         |Hello, World!|
         +-------------+
     """
-    
+
     row = len(msg)
     h = "".join(["+"] + ["-" * row] + ["+"])
     result = "\n" + h + "\n" "|" + msg + "|" "\n" + h

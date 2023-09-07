@@ -18,16 +18,18 @@ def __pprint(msg):
     result = h + "\n" "|" + msg + "|" "\n" + h
     print(result)
 
-def __get_data(json_file):
-	try:
-		# Open the JSON file
-		with open(json_file, 'r') as file:
-			# Load the JSON data into a dictionary
-			data = json.load(file)
 
-		return data
-	except:
-		return {}
+def __get_data(json_file):
+    try:
+        # Open the JSON file
+        with open(json_file, "r") as file:
+            # Load the JSON data into a dictionary
+            data = json.load(file)
+
+        return data
+    except:
+        return {}
+
 
 def __get_file_types(data):
     try:
@@ -46,6 +48,13 @@ def __get_frequencies(data):
 def __get_dataset_size(data):
     try:
         return data["size"]
+    except:
+        return None
+
+
+def __get_pretty_dataset_size(data):
+    try:
+        return data["pretty_size"]
     except:
         return None
 
@@ -75,6 +84,7 @@ def __get_files(directory):
 def __get_number_of_files(directory):
     return len(__get_files(directory))
 
+
 def generate_dataset_uuid(directory):
     if directory[-1] == "/":
         directory = directory[:-1]
@@ -96,6 +106,7 @@ def __get_temp_file(directory):
         return output_filename
     else:
         return None
+
 
 def __get_json_file(directory):
     dataset_uuid = generate_dataset_uuid(directory)
@@ -187,11 +198,11 @@ if df.keys()[0] == "<html>":
             sys.exit()
 
 ##clean dataframe
-if 'title' in df.keys():
-	df = df.drop('title', axis=1)
+if "title" in df.keys():
+    df = df.drop("title", axis=1)
 
-if 'abstract' in df.keys():
-	df = df.drop('abstract', axis=1)
+if "abstract" in df.keys():
+    df = df.drop("abstract", axis=1)
 
 print("\nPopulating dataframe with dataset UUIDs")
 df["dataset_uuid"] = df["bildirectory"].parallel_apply(generate_dataset_uuid)
@@ -202,21 +213,22 @@ df["json_file"] = df["bildirectory"].parallel_apply(__get_json_file)
 
 df = df[df["exists"] == True]
 
-print('\nGet data from JSON file')
+print("\nGet data from JSON file")
 for index, row in tqdm(df.iterrows()):
-	json_file = df.at[index, 'json_file']
-	data = __get_data(json_file)
-	df.loc[index,"creation_date"] = __get_creation_date(data)
-	df.loc[index,"size"] = __get_dataset_size(data)
+    json_file = df.at[index, "json_file"]
+    data = __get_data(json_file)
+    df.loc[index, "creation_date"] = __get_creation_date(data)
+    df.loc[index, "size"] = __get_dataset_size(data)
+    df.loc[index, "pretty_size"] = __get_pretty_dataset_size(data)
 
 print("\nGetting number of files")
 df["number_of_files"] = df["bildirectory"].parallel_apply(__get_number_of_files)
 
-#print("\nGetting file types")
-#df["file_types"] = df["json_file"].parallel_apply(__get_file_types)
+# print("\nGetting file types")
+# df["file_types"] = df["json_file"].parallel_apply(__get_file_types)
 
-#print("\nGetting frequencies")
-#df["frequencies"] = df["json_file"].parallel_apply(__get_frequencies)
+# print("\nGetting frequencies")
+# df["frequencies"] = df["json_file"].parallel_apply(__get_frequencies)
 
 print("\nComputing temp file filename")
 df["temp_file"] = df["bildirectory"].parallel_apply(__get_temp_file)

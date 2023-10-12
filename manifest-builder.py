@@ -530,7 +530,7 @@ def get_directory_creation_date(directory):
 dataset = {}
 dataset["dataset_uuid"] = generate_dataset_uuid(directory)
 dataset["creation_date"] = get_directory_creation_date(directory)
-dataset["directory"] = file.replace("_", "/")
+dataset["directory"] = directory
 dataset["download_url"] = get_url(dataset["directory"])
 dataset["number_of_files"] = len(df)
 dataset["size"] = df["size"].sum()

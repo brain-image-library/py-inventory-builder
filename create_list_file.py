@@ -244,15 +244,18 @@ def main():
             print("Ignoring list.json")
         else:
             print(file)
-            summary = summarize(file)
-            summaries.append(summary)
-            output_file = f"{output_directory}/{file.name}"
+            try:
+                summary = summarize(file)
+                summaries.append(summary)
+                output_file = f"{output_directory}/{file.name}"
 
-            if Path(output_file).exists():
-                Path(output_file).unlink()
+                if Path(output_file).exists():
+                    Path(output_file).unlink()
 
-            with open(output_file, "w") as json_file:
-                json.dump(summary, json_file, indent=4)
+                with open(output_file, "w") as json_file:
+                    json.dump(summary, json_file, indent=4)
+            except:
+                print(f"Unable to process file {file}")
 
     # Specify the path to the output JSON file
     output_file = f"{output_directory}/list.json"

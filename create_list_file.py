@@ -245,15 +245,19 @@ def main():
         else:
             print(file)
             try:
-                summary = summarize(file)
-                summaries.append(summary)
                 output_file = f"{output_directory}/{file.name}"
 
-                if Path(output_file).exists():
-                    Path(output_file).unlink()
+                if not Path(output_file).exists():
+                    summary = summarize(file)
+                    summaries.append(summary)
 
-                with open(output_file, "w") as json_file:
-                    json.dump(summary, json_file, indent=4)
+                    if Path(output_file).exists():
+                        Path(output_file).unlink()
+
+                    with open(output_file, "w") as json_file:
+                        json.dump(summary, json_file, indent=4)
+                else:
+                    print("Summary file {output_file} exists on disk.")
             except:
                 print(f"Unable to process file {file}")
 

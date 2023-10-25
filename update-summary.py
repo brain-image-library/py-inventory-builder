@@ -119,27 +119,35 @@ def __get_json_file(directory):
 
 
 def __get_md5_coverage(directory):
-    output_filename = __get_temp_file(directory)
-    if output_filename is not None and Path(output_filename).exists():
-        df = pd.read_csv(output_filename, sep="\t", low_memory=False)
-        if "md5" in df.keys():
-            return (len(df) - df["md5"].isnull().sum()) / len(df)
+    try:
+        output_filename = __get_temp_file(directory)
+        if output_filename is not None and Path(output_filename).exists():
+            df = pd.read_csv(output_filename, sep="\t", low_memory=False)
+            if "md5" in df.keys():
+                return (len(df) - df["md5"].isnull().sum()) / len(df)
+            else:
+                return 0
         else:
             return 0
-    else:
-        return 0
+    except:
+        print(f"Unable to process file {output_filename}")
+        return None
 
 
 def __get_sha256_coverage(directory):
-    output_filename = __get_temp_file(directory)
-    if output_filename is not None and Path(output_filename).exists():
-        df = pd.read_csv(output_filename, sep="\t", low_memory=False)
-        if "sha256" in df.keys():
-            return (len(df) - df["sha256"].isnull().sum()) / len(df)
+    try:
+        output_filename = __get_temp_file(directory)
+        if output_filename is not None and Path(output_filename).exists():
+            df = pd.read_csv(output_filename, sep="\t", low_memory=False)
+            if "sha256" in df.keys():
+                return (len(df) - df["sha256"].isnull().sum()) / len(df)
+            else:
+                return 0
         else:
             return 0
-    else:
-        return 0
+    except:
+        print(f"Unable to process file {output_filename}")
+        return None
 
 
 def __compute_score(datum):

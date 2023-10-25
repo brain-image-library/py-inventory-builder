@@ -1,6 +1,7 @@
 import pandas as pd
 from tqdm import tqdm
 from pathlib import Path
+import traceback
 import uuid
 import subprocess
 import json
@@ -243,7 +244,6 @@ def main():
         if str(file) == "/bil/data/inventory/list.json":
             print("Ignoring list.json")
         else:
-            print(file)
             try:
                 output_file = f"{output_directory}/{file.name}"
 
@@ -257,9 +257,19 @@ def main():
                     with open(output_file, "w") as json_file:
                         json.dump(summary, json_file, indent=4)
                 else:
-                    print("Summary file {output_file} exists on disk.")
+                    print(
+                        f"Summary file {output_file} exists on disk. Loading from disk."
+                    )
+
+                    # Open and read the JSON file
+                    with open(output_file, "r") as json_file:
+                        json_data = json_file.read()
+
+                    # Load the JSON data into a Python dictionary
+                    summaries.append(json.loads(json_data))
             except:
                 print(f"Unable to process file {file}")
+                traceback.print_exc()
 
     # Specify the path to the output JSON file
     output_file = f"{output_directory}/list.json"

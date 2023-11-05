@@ -1,8 +1,14 @@
 import argparse
 import datetime
 import gzip
+from numpyencoder import NumpyEncoder
 import hashlib
 import json
+import shutil
+import humanize
+import warnings
+import mimetypes
+import magic
 import os
 import os.path
 import sys
@@ -12,17 +18,13 @@ import time
 import uuid
 import warnings
 from pathlib import Path
-
+import hashlib
+from concurrent.futures import ProcessPoolExecutor
 import compress_json
 import numpy as np
 import pandas as pd
 import tabulate
-
-# from dask import delayed
-# from joblib import Parallel, delayed
 from pandarallel import pandarallel
-
-# from PIL import Image
 from tqdm import tqdm
 
 
@@ -49,10 +51,88 @@ def pprint(msg):
     print(result)
 
 
+def get_file_size(filename):
+    return Path(filename).stat().st_size
+
+
+def get_relative_path(full_path):
+    answer = str(full_path).replace(f"{directory}/", "")
+    return answer
+
+
 def __update_dataframe(dataset, temp, key):
     for index, datum in temp.iterrows():
         dataset.loc[index, key] = temp.loc[index, key]
     return dataset
+
+
+def get_filename(filename):
+    return Path(filename).stem + Path(filename).suffix
+
+    def __compute_sha256sum(filename):
+        # BUF_SIZE is totally arbitrary, change for your app!
+        BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
+
+        sha256 = hashlib.sha256()
+        if Path(filename).is_file() or Path(filename).is_symlink():
+            with open(filename, "rb") as f:
+                while True:
+                    data = f.read(BUF_SIZE)
+                    if not data:
+                        break
+                    sha256.update(data)
+
+        return sha256.hexdigest()
+
+
+def __compute_md5sum(filename):
+    # BUF_SIZE is totally arbitrary, change for your app!
+    BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
+
+    md5 = hashlib.md5()
+
+    if Path(filename).is_file() or Path(filename).is_symlink():
+        with open(filename, "rb") as f:
+            while True:
+                data = f.read(BUF_SIZE)
+                if not data:
+                    break
+                md5.update(data)
+
+    return md5.hexdigest()
+
+
+def __clean_directory(directory):
+    if directory[-1] == "/":
+        directory = directory[:-1]
+    return directory
+
+
+def __get_chunk_size(dataframe):
+    if len(dataframe) < 1000:
+        return 10
+    elif len(dataframe) < 10000:
+        return 100
+    elif len(dataframe) < 100000:
+        return 250
+    elif len(dataframe) < 500000:
+        return 500
+    else:
+        return 500
+
+
+def generate_dataset_uuid(directory):
+    if directory[-1] == "/":
+        directory = directory[:-1]
+
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, directory))
+
+
+def get_directory_creation_date(directory):
+    ti_c = os.path.getctime(directory)
+    c_ti = time.ctime(ti_c)
+
+    return c_ti
 
 
 def __get_files(directory):
@@ -64,8 +144,60 @@ def __get_files(directory):
     return files
 
 
+def get_file_extension(filename):
+    if Path(filename).is_file() or Path(filename).is_symlink():
+        extension = Path(filename).suffix
+        if extension == ".tiff" or extension == ".tif":
+            if str(filename).find("ome.tif") > 0:
+                extension = ".ome.tif"
+
+    return extension
+
+
 def __get_number_of_files(directory):
     return len(__get_files(directory))
+
+
+def get_mime_type(filename):
+    answer = mimetypes.guess_type(filename)
+    try:
+        return answer[0]
+    except:
+        return None
+
+
+def get_filetype(extension):
+    images = {
+        ".tiff",
+        ".png",
+        ".tif",
+        ".ome.tif",
+        ".jpeg",
+        ".ims",
+        ".gif",
+        ".ome.tiff",
+        "jpg",
+        ".jp2",
+    }
+
+    if extension in images:
+        return "images"
+
+    tracings = {".swc", ".marker"}
+    if extension in tracings:
+        return "tracing"
+
+    return "other"
+
+
+def get_url(filename):
+    filename = str(filename)
+    return filename.replace("/bil/data/", "https://download.brainimagelibrary.org/")
+
+
+def get_file_creation_date(filename):
+    t = os.path.getmtime(str(filename))
+    return str(datetime.datetime.fromtimestamp(t))
 
 
 def __to_json(df, direcotry):
@@ -184,18 +316,6 @@ if df.empty:
 
 ###############################################################################################################
 pprint("Get file extensions")
-
-
-def get_file_extension(filename):
-    if Path(filename).is_file() or Path(filename).is_symlink():
-        extension = Path(filename).suffix
-        if extension == ".tiff" or extension == ".tif":
-            if str(filename).find("ome.tif") > 0:
-                extension = ".ome.tif"
-
-    return extension
-
-
 if "extension" not in df.keys():
     print("Computing file extension")
     df["extension"] = df["fullpath"].parallel_apply(get_file_extension)
@@ -205,25 +325,12 @@ else:
 
 ###############################################################################################################
 pprint("Get filename")
-
-
-def get_filename(filename):
-    return Path(filename).stem + Path(filename).suffix
-
-
 if "filename" not in df.keys():
     df["filename"] = df["fullpath"].parallel_apply(get_filename)
     df.to_csv(output_filename, sep="\t", index=False)
 
 ###############################################################################################################
 pprint("Get relative path")
-
-
-def get_relative_path(full_path):
-    answer = str(full_path).replace(f"{directory}/", "")
-    return answer
-
-
 if "relativepath" not in df.keys():
     print("Computing relative paths")
     df["relativepath"] = df["fullpath"].parallel_apply(get_relative_path)
@@ -233,32 +340,6 @@ else:
 
 ###############################################################################################################
 pprint("Get file type")
-
-
-def get_filetype(extension):
-    images = {
-        ".tiff",
-        ".png",
-        ".tif",
-        ".ome.tif",
-        ".jpeg",
-        ".ims",
-        ".gif",
-        ".ome.tiff",
-        "jpg",
-        ".jp2",
-    }
-
-    if extension in images:
-        return "images"
-
-    tracings = {".swc", ".marker"}
-    if extension in tracings:
-        return "tracing"
-
-    return "other"
-
-
 if "filetype" not in df.keys():
     print("Computing file type")
     df["filetype"] = df["extension"].parallel_apply(get_filetype)
@@ -266,16 +347,8 @@ if "filetype" not in df.keys():
 else:
     print("No files left to process")
 
-
 ###############################################################################################################
 pprint("Get file creation date")
-
-
-def get_file_creation_date(filename):
-    t = os.path.getmtime(str(filename))
-    return str(datetime.datetime.fromtimestamp(t))
-
-
 if "modification_time" not in df.keys():
     print("Computing modification time")
     df["modification_time"] = df["fullpath"].parallel_apply(get_file_creation_date)
@@ -283,15 +356,8 @@ if "modification_time" not in df.keys():
 else:
     print("No files left to process")
 
-
 ###############################################################################################################
 pprint("Get file size")
-
-
-def get_file_size(filename):
-    return Path(filename).stat().st_size
-
-
 if "size" not in df.keys():
     print("Computing file size")
     df["size"] = df["fullpath"].parallel_apply(get_file_size)
@@ -301,24 +367,6 @@ else:
 
 ###############################################################################################################
 pprint("Get mime-type")
-import mimetypes
-
-import magic
-
-
-def get_mime_type(filename):
-    mime = magic.Magic(mime=True)
-    return mime.from_file(filename)
-
-
-def get_mime_type(filename):
-    answer = mimetypes.guess_type(filename)
-    try:
-        return answer[0]
-    except:
-        return None
-
-
 if "mime-type" not in df.keys():
     print("Computing mime-type")
     df["mime-type"] = df["fullpath"].parallel_apply(get_mime_type)
@@ -328,13 +376,6 @@ else:
 
 ###############################################################################################################
 pprint("Get download link for each file")
-
-
-def get_url(filename):
-    filename = str(filename)
-    return filename.replace("/bil/data/", "https://download.brainimagelibrary.org/")
-
-
 if "download_url" not in df.keys():
     print("Computing download URL")
     df["download_url"] = df["fullpath"].parallel_apply(get_url)
@@ -343,41 +384,9 @@ else:
     print("No files left to process")
 
 ###############################################################################################################
-import shutil
-import warnings
-
 warnings.filterwarnings("ignore")
-
 if not avoid_checksums:
     pprint("Computing MD5 checksum")
-
-    def __compute_md5sum(filename):
-        # BUF_SIZE is totally arbitrary, change for your app!
-        BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
-
-        md5 = hashlib.md5()
-
-        if Path(filename).is_file() or Path(filename).is_symlink():
-            with open(filename, "rb") as f:
-                while True:
-                    data = f.read(BUF_SIZE)
-                    if not data:
-                        break
-                    md5.update(data)
-
-        return md5.hexdigest()
-
-    def __get_chunk_size(dataframe):
-        if len(dataframe) < 1000:
-            return 10
-        elif len(dataframe) < 10000:
-            return 100
-        elif len(dataframe) < 100000:
-            return 250
-        elif len(dataframe) < 500000:
-            return 500
-        else:
-            return 500
 
     if len(df) < 100:
         if "md5" in df.keys():
@@ -423,36 +432,8 @@ if not avoid_checksums:
     df.to_csv(output_filename, sep="\t", index=False)
 
 ###############################################################################################################
-
 if not avoid_checksums:
     pprint("Computing SHA256 checksum")
-
-    def __compute_sha256sum(filename):
-        # BUF_SIZE is totally arbitrary, change for your app!
-        BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
-
-        sha256 = hashlib.sha256()
-        if Path(filename).is_file() or Path(filename).is_symlink():
-            with open(filename, "rb") as f:
-                while True:
-                    data = f.read(BUF_SIZE)
-                    if not data:
-                        break
-                    sha256.update(data)
-
-        return sha256.hexdigest()
-
-    def __get_chunk_size(dataframe):
-        if len(dataframe) < 1000:
-            return 10
-        elif len(dataframe) < 10000:
-            return 100
-        elif len(dataframe) < 100000:
-            return 250
-        elif len(dataframe) < 500000:
-            return 500
-        else:
-            return 500
 
     if len(df) < 100:
         if "sha256" in df.keys():
@@ -503,29 +484,6 @@ if not avoid_checksums:
 
 ###############################################################################################################
 pprint("Computing dataset level statistics")
-import humanize
-
-
-def get_url(filename):
-    return filename.replace("/bil/data/", "https://download.brainimagelibrary.org/")
-
-
-from numpyencoder import NumpyEncoder
-
-
-def generate_dataset_uuid(directory):
-    if directory[-1] == "/":
-        directory = directory[:-1]
-
-    return str(uuid.uuid5(uuid.NAMESPACE_DNS, directory))
-
-
-def get_directory_creation_date(directory):
-    ti_c = os.path.getctime(directory)
-    c_ti = time.ctime(ti_c)
-
-    return c_ti
-
 
 dataset = {}
 dataset["dataset_uuid"] = generate_dataset_uuid(directory)
@@ -540,13 +498,6 @@ dataset["file_types"] = df["filetype"].value_counts().to_dict()
 
 local_file = "summary_metadata.tsv"
 metadata = pd.read_csv(local_file, sep="\t")
-
-
-def __clean_directory(directory):
-    if directory[-1] == "/":
-        directory = directory[:-1]
-    return directory
-
 
 metadata["bildirectory"] = metadata["bildirectory"].apply(__clean_directory)
 

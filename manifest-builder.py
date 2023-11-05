@@ -318,11 +318,18 @@ parser.add_argument(
     dest="avoid_checksums",
     default=False,
 )
+parser.add_argument(
+    "--multi-threading",
+    action=argparse.BooleanOptionalAction,
+    dest="multi_threading",
+    default=False,
+)
 args = parser.parse_args()
 directory = args.directory
 update_json_file_on_bil_data = bool(args.update)
 compress_json_file_on_bil_data = bool(args.compress)
 avoid_checksums = bool(args.avoid_checksums)
+multi_threading = bool(args.multi_threading)
 rebuild = bool(args.rebuild)
 ncores = int(args.ncores)
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
@@ -375,13 +382,15 @@ if "extension" not in df.keys():
     df["extension"] = df["fullpath"].parallel_apply(get_file_extension)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
-    print("No files left to process")
+    print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get filename")
 if "filename" not in df.keys():
     df["filename"] = df["fullpath"].parallel_apply(get_filename)
     df.to_csv(output_filename, sep="\t", index=False)
+else:
+    print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get relative path")
@@ -390,7 +399,7 @@ if "relativepath" not in df.keys():
     df["relativepath"] = df["fullpath"].parallel_apply(get_relative_path)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
-    print("No files left to process")
+    print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get file type")
@@ -399,7 +408,7 @@ if "filetype" not in df.keys():
     df["filetype"] = df["extension"].parallel_apply(get_filetype)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
-    print("No files left to process")
+    print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get file creation date")
@@ -408,7 +417,7 @@ if "modification_time" not in df.keys():
     df["modification_time"] = df["fullpath"].parallel_apply(get_file_creation_date)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
-    print("No files left to process")
+    print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get file size")
@@ -417,7 +426,7 @@ if "size" not in df.keys():
     df["size"] = df["fullpath"].parallel_apply(get_file_size)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
-    print("No files left to process")
+    print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get mime-type")
@@ -426,7 +435,7 @@ if "mime-type" not in df.keys():
     df["mime-type"] = df["fullpath"].parallel_apply(get_mime_type)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
-    print("No files left to process")
+    print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get download link for each file")
@@ -435,7 +444,7 @@ if "download_url" not in df.keys():
     df["download_url"] = df["fullpath"].parallel_apply(get_url)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
-    print("No files left to process")
+    print("No files left to process.")
 
 ###############################################################################################################
 warnings.filterwarnings("ignore")
@@ -450,7 +459,13 @@ if not avoid_checksums:
         print(f"Number of files to process is {str(len(files))}")
 
         if len(files) > 0:
-            files["md5"] = files["fullpath"].parallel_apply(__compute_md5sum_threaded)
+            if multi_threading:
+                files["md5"] = files["fullpath"].parallel_apply(
+                    __compute_md5sum_threaded
+                )
+            else:
+                files["md5"] = files["fullpath"].parallel_apply(__compute_md5sum)
+
             df = __update_dataframe(df, files, "md5")
             df.to_csv(output_filename, sep="\t", index=False)
     else:
@@ -463,7 +478,13 @@ if not avoid_checksums:
             n = __get_chunk_size(files)
             print(f"Number of files to process is {str(len(files))}")
             if n < 25:
-                files["md5"] = files["fullpath"].parallel_apply(__compute_md5sum)
+                if multi_threading:
+                    files["md5"] = files["fullpath"].parallel_apply(
+                        __compute_md5sum_threaded
+                    )
+                else:
+                    files["md5"] = files["fullpath"].parallel_apply(__compute_md5sum)
+
                 df = __update_dataframe(df, files, "md5")
                 df.to_csv(output_filename, sep="\t", index=False)
             else:
@@ -473,7 +494,15 @@ if not avoid_checksums:
                     print(
                         f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}"
                     )
-                    chunk["md5"] = chunk["fullpath"].parallel_apply(__compute_md5sum)
+                    if multi_threading:
+                        chunk["md5"] = chunk["fullpath"].parallel_apply(
+                            __compute_md5sum_threaded
+                        )
+                    else:
+                        chunk["md5"] = chunk["fullpath"].parallel_apply(
+                            __compute_md5sum
+                        )
+
                     df = __update_dataframe(df, chunk, "md5")
                     chunk_counter = chunk_counter + 1
 
@@ -481,7 +510,7 @@ if not avoid_checksums:
                         print("\nSaving chunks to disk")
                         df.to_csv(output_filename, sep="\t", index=False)
         else:
-            print("No files left to process")
+            print("No files left to process.")
 
     df.to_csv(output_filename, sep="\t", index=False)
 
@@ -497,7 +526,13 @@ if not avoid_checksums:
         print(f"Number of files to process is {str(len(files))}")
 
         if len(files) > 0:
-            files["sha256"] = files["fullpath"].parallel_apply(__compute_sha256sum)
+            if multi_threading:
+                files["sha256"] = files["fullpath"].parallel_apply(
+                    __compute_sha256sum_threaded
+                )
+            else:
+                files["sha256"] = files["fullpath"].parallel_apply(__compute_sha256sum)
+
             df = __update_dataframe(df, files, "sha256")
             df.to_csv(output_filename, sep="\t", index=False)
     else:
@@ -511,9 +546,15 @@ if not avoid_checksums:
             print(f"Number of files to process is {str(len(files))}")
 
             if n < 25:
-                files["sha256"] = files["fullpath"].parallel_apply(
-                    __compute_sha256sum_threaded
-                )
+                if multi_threading:
+                    files["sha256"] = files["fullpath"].parallel_apply(
+                        __compute_sha256sum_threaded
+                    )
+                else:
+                    files["sha256"] = files["fullpath"].parallel_apply(
+                        __compute_sha256sum
+                    )
+
                 df = __update_dataframe(df, files, "sha256")
                 df.to_csv(output_filename, sep="\t", index=False)
             else:
@@ -524,9 +565,15 @@ if not avoid_checksums:
                     print(
                         f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}"
                     )
-                    chunk["sha256"] = chunk["fullpath"].parallel_apply(
-                        __compute_sha256sum
-                    )
+                    if multi_threading:
+                        chunk["sha256"] = chunk["fullpath"].parallel_apply(
+                            __compute_sha256sum_threaded
+                        )
+                    else:
+                        chunk["sha256"] = chunk["fullpath"].parallel_apply(
+                            __compute_sha256sum
+                        )
+
                     df = __update_dataframe(df, chunk, "sha256")
                     chunk_counter = chunk_counter + 1
 
@@ -534,7 +581,7 @@ if not avoid_checksums:
                         print("\nSaving chunks to disk")
                         df.to_csv(output_filename, sep="\t", index=False)
         else:
-            print("No files left to process")
+            print("No files left to process.")
 
     df.to_csv(output_filename, sep="\t", index=False)
 

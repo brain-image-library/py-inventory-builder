@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import gzip
+import threading
 from numpyencoder import NumpyEncoder
 import hashlib
 import json
@@ -69,20 +70,73 @@ def __update_dataframe(dataset, temp, key):
 def get_filename(filename):
     return Path(filename).stem + Path(filename).suffix
 
-    def __compute_sha256sum(filename):
-        # BUF_SIZE is totally arbitrary, change for your app!
-        BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
 
-        sha256 = hashlib.sha256()
-        if Path(filename).is_file() or Path(filename).is_symlink():
-            with open(filename, "rb") as f:
-                while True:
-                    data = f.read(BUF_SIZE)
-                    if not data:
-                        break
-                    sha256.update(data)
+def __compute_sha256sum(filename):
+    # BUF_SIZE is totally arbitrary, change for your app!
+    BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
 
-        return sha256.hexdigest()
+    sha256 = hashlib.sha256()
+    if Path(filename).is_file() or Path(filename).is_symlink():
+        with open(filename, "rb") as f:
+            while True:
+                data = f.read(BUF_SIZE)
+                if not data:
+                    break
+                sha256.update(data)
+
+    return sha256.hexdigest()
+
+
+def __compute_sha256sum_threaded(filename):
+    BUF_SIZE = 65536
+
+    sha256 = hashlib.sha256()
+
+    if Path(filename).is_file() or Path(filename).is_symlink():
+
+        def hash_chunk(chunk, sha256):
+            sha256.update(chunk)
+
+        threads = []
+        with open(filename, "rb") as f:
+            while True:
+                data = f.read(BUF_SIZE)
+                if not data:
+                    break
+                thread = threading.Thread(target=hash_chunk, args=(data, sha256))
+                thread.start()
+                threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
+    return sha256.hexdigest()
+
+
+def __compute_md5sum_threaded(filename):
+    BUF_SIZE = 65536
+
+    md5 = hashlib.md5()
+
+    if Path(filename).is_file() or Path(filename).is_symlink():
+
+        def hash_chunk(chunk, md5):
+            md5.update(chunk)
+
+        threads = []
+        with open(filename, "rb") as f:
+            while True:
+                data = f.read(BUF_SIZE)
+                if not data:
+                    break
+                thread = threading.Thread(target=hash_chunk, args=(data, md5))
+                thread.start()
+                threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
+    return md5.hexdigest()
 
 
 def __compute_md5sum(filename):
@@ -396,7 +450,7 @@ if not avoid_checksums:
         print(f"Number of files to process is {str(len(files))}")
 
         if len(files) > 0:
-            files["md5"] = files["fullpath"].parallel_apply(__compute_md5sum)
+            files["md5"] = files["fullpath"].parallel_apply(__compute_md5sum_threaded)
             df = __update_dataframe(df, files, "md5")
             df.to_csv(output_filename, sep="\t", index=False)
     else:
@@ -457,7 +511,9 @@ if not avoid_checksums:
             print(f"Number of files to process is {str(len(files))}")
 
             if n < 25:
-                files["sha256"] = files["fullpath"].parallel_apply(__compute_sha256sum)
+                files["sha256"] = files["fullpath"].parallel_apply(
+                    __compute_sha256sum_threaded
+                )
                 df = __update_dataframe(df, files, "sha256")
                 df.to_csv(output_filename, sep="\t", index=False)
             else:

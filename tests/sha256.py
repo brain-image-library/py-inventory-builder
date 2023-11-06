@@ -8,6 +8,32 @@ import argparse
 import subprocess
 from pandarallel import pandarallel
 
+def compute_sha256sum(filename):
+    BUF_SIZE = 65536
+
+    sha256 = hashlib.sha256()
+
+    if Path(filename).is_file() or Path(filename).is_symlink():
+        start_time = time.time()  # Measure start time
+        with open(filename, "rb") as f:
+            while True:
+                data = f.read(BUF_SIZE)
+                if not data:
+                    break
+                sha256.update(data)
+
+        end_time = time.time()  # Measure end time
+        elapsed_time = end_time - start_time  # Calculate elapsed time
+
+        return {
+            "filename": filename,
+            "threads": 1,
+            "elapsed_time": elapsed_time,
+            "sha256": sha256.hexdigest(),
+        }
+
+    return {"filename": None, "threads": 0, "elapsed_time": 0, "sha256": None}
+
 
 def compute_sha256sum_threaded(filename):
     BUF_SIZE = 65536
@@ -71,6 +97,9 @@ data = []
 for file in tqdm(files):
     data.append(compute_sha256sum_threaded(file))
 
+for file in tqdm(files):
+    data.append(compute_sha256sum(file))
+
 df = pd.DataFrame(data)
 file = "sha256.tsv"
-df.to_csv(file, sep="\t", index=False, mode="a", header=not df.empty)
+df.to_csv(file, sep="\t", index=False, mode="a", header=df)

@@ -62,15 +62,15 @@ parser.add_argument("-d", "--directory", dest="directory", help="Directory")
 args = parser.parse_args()
 directory = args.directory
 
-ncores = int(args.ncores)
+ncores = 1
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 
 files = __get_files(directory)
 
-data = {}
+data = []
 for file in tqdm(files):
     data.append(compute_sha256sum_threaded(file))
 
 df = pd.DataFrame(data)
 file = "sha256.tsv"
-df.to_tsv(file, sep="\t", index=False, mode="a")
+df.to_csv(file, sep="\t", index=False, mode="a", header=not df.empty)

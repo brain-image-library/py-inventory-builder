@@ -379,7 +379,7 @@ if not Path("json").exists():
 file = directory.replace("/", "_")
 output_filename = f".data/{file}.tsv"
 
-checkpoint = output_filename.replace(".tsv", "computing")
+checkpoint = output_filename.replace(".tsv", ".computing")
 
 if not __create_checkpoint_file(checkpoint):
     print("Another process is building an inventory for this dataset. Exiting")

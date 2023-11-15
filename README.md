@@ -37,10 +37,6 @@ python inventory_script.py -d <directory_path> [-n <number_of_cores>] [--update]
 python inventory_script.py -d /path/to/dataset -n 4 --update --compress
 ```
 
-## License
-This script is licensed under the MIT License.
-
-
 ---
 Copyright © 2020-2023 Pittsburgh Supercomputing Center. All Rights Reserved.
 

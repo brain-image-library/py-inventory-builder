@@ -52,11 +52,42 @@ def pprint(msg):
     print(result)
 
 
-def get_file_size(filename):
+def __create_checkpoint_file(filename):
+    # Create a Path object for the specified filename
+    file_path = Path(filename)
+
+    # Check if the file already exists
+    if not file_path.exists():
+        # If the file doesn't exist, create an empty file
+        with open(file_path, "w"):
+            pass
+        print(f"Checkpoint file '{filename}' created successfully.")
+        return True
+    else:
+        print(f"Checkpoint file '{filename}' already exists.")
+        return False
+
+
+def __remove_checkpoint_file(filename):
+    # Create a Path object for the specified filename
+    file_path = Path(filename)
+
+    # Check if the file exists
+    if file_path.exists():
+        # If the file exists, remove it
+        file_path.unlink()
+        print(f"Checkpoint file '{filename}' removed successfully.")
+        return True
+    else:
+        print(f"Checkpoint file '{filename}' does not exist.")
+        return False
+
+
+def __get_file_size(filename):
     return Path(filename).stat().st_size
 
 
-def get_relative_path(full_path):
+def __get_relative_path(full_path):
     answer = str(full_path).replace(f"{directory}/", "")
     return answer
 
@@ -67,7 +98,7 @@ def __update_dataframe(dataset, temp, key):
     return dataset
 
 
-def get_filename(filename):
+def __get_filename(filename):
     return Path(filename).stem + Path(filename).suffix
 
 
@@ -175,14 +206,14 @@ def __get_chunk_size(dataframe):
         return 500
 
 
-def generate_dataset_uuid(directory):
+def __generate_dataset_uuid(directory):
     if directory[-1] == "/":
         directory = directory[:-1]
 
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, directory))
 
 
-def get_directory_creation_date(directory):
+def __get_directory_creation_date(directory):
     ti_c = os.path.getctime(directory)
     c_ti = time.ctime(ti_c)
 
@@ -198,7 +229,7 @@ def __get_files(directory):
     return files
 
 
-def get_file_extension(filename):
+def __get_file_extension(filename):
     if Path(filename).is_file() or Path(filename).is_symlink():
         extension = Path(filename).suffix
         if extension == ".tiff" or extension == ".tif":
@@ -212,7 +243,7 @@ def __get_number_of_files(directory):
     return len(__get_files(directory))
 
 
-def get_mime_type(filename):
+def __get_mime_type(filename):
     answer = mimetypes.guess_type(filename)
     try:
         return answer[0]
@@ -220,7 +251,7 @@ def get_mime_type(filename):
         return None
 
 
-def get_filetype(extension):
+def __get_filetype(extension):
     images = {
         ".tiff",
         ".png",
@@ -244,22 +275,22 @@ def get_filetype(extension):
     return "other"
 
 
-def get_url(filename):
+def __get_url(filename):
     filename = str(filename)
     return filename.replace("/bil/data/", "https://download.brainimagelibrary.org/")
 
 
-def get_file_creation_date(filename):
+def __get_file_creation_date(filename):
     t = os.path.getmtime(str(filename))
     return str(datetime.datetime.fromtimestamp(t))
 
 
-def __to_json(df, direcotry):
+def __to_json(df, directory):
     df["fullpath"] = df["fullpath"].astype(str)
     files = df.to_dict("records")
     dataset["manifest"] = files
 
-    output_filename = "json/" + generate_dataset_uuid(directory) + ".json"
+    output_filename = "json/" + __generate_dataset_uuid(directory) + ".json"
     with open(output_filename, "w") as ofile:
         json.dump(
             dataset,
@@ -278,7 +309,9 @@ def __to_json(df, direcotry):
     print(f"Saving results to {output_filename}.")
 
     if update_json_file_on_bil_data:
-        output_filename = f"/bil/data/inventory/{generate_dataset_uuid(directory)}.json"
+        output_filename = (
+            f"/bil/data/inventory/{__generate_dataset_uuid(directory)}.json"
+        )
         with open(output_filename, "w") as ofile:
             json.dump(
                 dataset,
@@ -344,7 +377,13 @@ if not Path("json").exists():
     Path("json").mkdir()
 
 file = directory.replace("/", "_")
-output_filename = ".data/" + file + ".tsv"
+output_filename = f".data/{file}.tsv"
+
+checkpoint = output_filename.replace(".tsv", "computing")
+
+if not __create_checkpoint_file(checkpoint):
+    print("Another process is building an inventory for this dataset. Exiting")
+    sys.exit()
 
 if rebuild:
     if Path(output_filename).exists() or Path(output_filename).is_symlink():
@@ -379,7 +418,7 @@ if df.empty:
 pprint("Get file extensions")
 if "extension" not in df.keys():
     print("Computing file extension")
-    df["extension"] = df["fullpath"].parallel_apply(get_file_extension)
+    df["extension"] = df["fullpath"].parallel_apply(__get_file_extension)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
@@ -387,7 +426,7 @@ else:
 ###############################################################################################################
 pprint("Get filename")
 if "filename" not in df.keys():
-    df["filename"] = df["fullpath"].parallel_apply(get_filename)
+    df["filename"] = df["fullpath"].parallel_apply(__get_filename)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
@@ -396,7 +435,7 @@ else:
 pprint("Get relative path")
 if "relativepath" not in df.keys():
     print("Computing relative paths")
-    df["relativepath"] = df["fullpath"].parallel_apply(get_relative_path)
+    df["relativepath"] = df["fullpath"].parallel_apply(__get_relative_path)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
@@ -405,7 +444,7 @@ else:
 pprint("Get file type")
 if "filetype" not in df.keys():
     print("Computing file type")
-    df["filetype"] = df["extension"].parallel_apply(get_filetype)
+    df["filetype"] = df["extension"].parallel_apply(__get_filetype)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
@@ -414,7 +453,7 @@ else:
 pprint("Get file creation date")
 if "modification_time" not in df.keys():
     print("Computing modification time")
-    df["modification_time"] = df["fullpath"].parallel_apply(get_file_creation_date)
+    df["modification_time"] = df["fullpath"].parallel_apply(__get_file_creation_date)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
@@ -423,7 +462,7 @@ else:
 pprint("Get file size")
 if "size" not in df.keys():
     print("Computing file size")
-    df["size"] = df["fullpath"].parallel_apply(get_file_size)
+    df["size"] = df["fullpath"].parallel_apply(__get_file_size)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
@@ -432,7 +471,7 @@ else:
 pprint("Get mime-type")
 if "mime-type" not in df.keys():
     print("Computing mime-type")
-    df["mime-type"] = df["fullpath"].parallel_apply(get_mime_type)
+    df["mime-type"] = df["fullpath"].parallel_apply(__get_mime_type)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
@@ -441,7 +480,7 @@ else:
 pprint("Get download link for each file")
 if "download_url" not in df.keys():
     print("Computing download URL")
-    df["download_url"] = df["fullpath"].parallel_apply(get_url)
+    df["download_url"] = df["fullpath"].parallel_apply(__get_url)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
@@ -589,10 +628,10 @@ if not avoid_checksums:
 pprint("Computing dataset level statistics")
 
 dataset = {}
-dataset["dataset_uuid"] = generate_dataset_uuid(directory)
-dataset["creation_date"] = get_directory_creation_date(directory)
+dataset["dataset_uuid"] = __generate_dataset_uuid(directory)
+dataset["creation_date"] = __get_directory_creation_date(directory)
 dataset["directory"] = directory
-dataset["download_url"] = get_url(dataset["directory"])
+dataset["download_url"] = __get_url(dataset["directory"])
 dataset["number_of_files"] = len(df)
 dataset["size"] = df["size"].sum()
 dataset["pretty_size"] = humanize.naturalsize(dataset["size"], gnu=True)
@@ -641,4 +680,5 @@ if not metadata[metadata["bildirectory"] == directory].empty:
 
 __to_json(df, directory)
 
+__remove_checkpoint_file(checkpoint)
 print("Done.\n")

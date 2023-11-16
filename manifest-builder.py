@@ -53,6 +53,23 @@ def pprint(msg):
 
 
 def __create_checkpoint_file(filename):
+    """
+    Creates a checkpoint file if it doesn't exist.
+
+    Args:
+        filename (str): The name of the file to create.
+
+    Returns:
+        bool: True if the file is created successfully, False if the file already exists.
+
+    Raises:
+        Any exceptions raised during file creation.
+
+    Example:
+        >>> __create_checkpoint_file("example.txt")
+        Checkpoint file 'example.txt' created successfully.
+        True
+    """
     # Create a Path object for the specified filename
     file_path = Path(filename)
 

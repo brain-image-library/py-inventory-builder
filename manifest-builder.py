@@ -397,9 +397,13 @@ file = directory.replace("/", "_")
 output_filename = f".data/{file}.tsv"
 
 checkpoint = output_filename.replace(".tsv", ".computing")
-
 if not __create_checkpoint_file(checkpoint):
-    print("Another process is building an inventory for this dataset. Exiting")
+    print("Another process is building an inventory for this dataset. Exiting.")
+    sys.exit()
+
+done = output_filename.replace(".tsv", ".done")
+if Path(done).exists():
+    print("The processing of this dataset is finished. Exiting.")
     sys.exit()
 
 if rebuild:
@@ -698,4 +702,5 @@ if not metadata[metadata["bildirectory"] == directory].empty:
 __to_json(df, directory)
 
 __remove_checkpoint_file(checkpoint)
+__create_checkpoint_file(done)
 print("Done.\n")

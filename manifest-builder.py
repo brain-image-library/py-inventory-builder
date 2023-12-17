@@ -1,3 +1,4 @@
+import xxhash
 import argparse
 import datetime
 import gzip
@@ -117,6 +118,18 @@ def __update_dataframe(dataset, temp, key):
 
 def __get_filename(filename):
     return Path(filename).stem + Path(filename).suffix
+
+
+def __compute_xxh64sum(filename):
+    hasher = xxhash.xxh64()  # Choose the appropriate hash function (xxh32, xxh64, etc.)
+    BUFF_SIZE = 65536
+
+    # Open the file in binary mode
+    with open(filename, "rb") as file:
+        for chunk in iter(lambda: file.read(), b""):  # Read file in chunks
+            hasher.update(chunk)  # Update hash with each chunk
+
+    return hasher.hexdigest()  # Get the hexadecimal digest of the hash
 
 
 def __compute_sha256sum(filename):
@@ -573,6 +586,60 @@ if not avoid_checksums:
             print("No files left to process.")
 
     df.to_csv(output_filename, sep="\t", index=False)
+
+###############################################################################################################
+warnings.filterwarnings("ignore")
+if not avoid_checksums:
+    pprint("Computing xxh64 checksum")
+
+    if len(df) < 100:
+        if "xxh64" in df.keys():
+            files = df[df["xxh64"].isnull()]
+        else:
+            files = df
+        print(f"Number of files to process is {str(len(files))}")
+
+        if len(files) > 0:
+            files["xxh64"] = files["fullpath"].parallel_apply(__compute_xxh64sum)
+
+            df = __update_dataframe(df, files, "xxh64")
+            df.to_csv(output_filename, sep="\t", index=False)
+    else:
+        if "xxh64" in df.keys():
+            files = df[df["xxh64"].isnull()]
+        else:
+            files = df
+
+        if len(files) != 0:
+            n = __get_chunk_size(files)
+            print(f"Number of files to process is {str(len(files))}")
+            if n < 25:
+                files["xxh64"] = files["fullpath"].parallel_apply(__compute_xxh64sum)
+
+                df = __update_dataframe(df, files, "xxh64")
+                df.to_csv(output_filename, sep="\t", index=False)
+            else:
+                chunks = np.array_split(files, n)
+                chunk_counter = 1
+                for chunk in chunks:
+                    print(
+                        f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}"
+                    )
+                    chunk["xxh64"] = chunk["fullpath"].parallel_apply(
+                        __compute_xxh64sum
+                    )
+
+                    df = __update_dataframe(df, chunk, "xxh64")
+                    chunk_counter = chunk_counter + 1
+
+                    if chunk_counter % 10 == 0 or chunk_counter == len(chunks):
+                        print("\nSaving chunks to disk")
+                        df.to_csv(output_filename, sep="\t", index=False)
+        else:
+            print("No files left to process.")
+
+    df.to_csv(output_filename, sep="\t", index=False)
+
 
 ###############################################################################################################
 if not avoid_checksums:

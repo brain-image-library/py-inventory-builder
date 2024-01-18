@@ -739,7 +739,7 @@ if not metadata[metadata["bildirectory"] == directory].empty:
     ].values[0]
 
     dataset["contributor_name"] = metadata[metadata["bildirectory"] == directory][
-        "contributorname"
+        "contributor"
     ].values[0]
 
     dataset["affiliation"] = metadata[metadata["bildirectory"] == directory][
@@ -759,7 +759,7 @@ if not metadata[metadata["bildirectory"] == directory].empty:
     ].values[0]
 
     dataset["taxonomy"] = metadata[metadata["bildirectory"] == directory][
-        "ncbitaxonomy"
+        "taxonomy"
     ].values[0]
 
     dataset["technique"] = metadata[metadata["bildirectory"] == directory][

@@ -14,25 +14,49 @@ from pandarallel import pandarallel
 
 
 def __pprint(msg):
+    """
+    Pretty prints a message with a surrounding border of '+' and '-' characters.
+
+    Args:
+        msg (str): The message to be printed.
+
+    Returns:
+        None
+    """
     row = len(msg)
-    h = "".join(["+"] + ["-" * row] + ["+"])
-    result = h + "\n" "|" + msg + "|" "\n" + h
-    print(result)
+    h = "".join(["+"] + ["-" * row] + ["+"])  # Create the border line
+    result = h + "\n" "|" + msg + "|" "\n" + h  # Construct the formatted message
+    print(result)  # Print the formatted message
 
 
 def __get_data(json_file):
-    try:
-        # Open the JSON file
-        with open(json_file, "r") as file:
-            # Load the JSON data into a dictionary
-            data = json.load(file)
+    """
+    Reads and loads JSON data from a specified file into a dictionary.
 
+    Args:
+        json_file (str): Path to the JSON file.
+
+    Returns:
+        dict: A dictionary containing the loaded JSON data, or an empty dictionary if the file cannot be read.
+    """
+    try:
+        with open(json_file, "r") as file:
+            data = json.load(file)
         return data
     except:
         return {}
 
 
 def __get_file_types(data):
+    """
+    Retrieves the 'file_types' attribute from a JSON data dictionary.
+
+    Args:
+        data (dict): The JSON data dictionary.
+
+    Returns:
+        list or None: List of file types, or None if 'file_types' attribute is missing or invalid.
+    """
     try:
         return data["file_types"]
     except:
@@ -40,6 +64,15 @@ def __get_file_types(data):
 
 
 def __get_frequencies(data):
+    """
+    Retrieves the 'frequencies' attribute from a JSON data dictionary.
+
+    Args:
+        data (dict): The JSON data dictionary.
+
+    Returns:
+        dict or None: Dictionary of frequencies, or None if 'frequencies' attribute is missing or invalid.
+    """
     try:
         return data["frequencies"]
     except:
@@ -47,6 +80,15 @@ def __get_frequencies(data):
 
 
 def __get_dataset_size(data):
+    """
+    Retrieves the 'size' attribute from a JSON data dictionary.
+
+    Args:
+        data (dict): The JSON data dictionary.
+
+    Returns:
+        int or None: Size of the dataset, or None if 'size' attribute is missing or invalid.
+    """
     try:
         return data["size"]
     except:
@@ -54,6 +96,15 @@ def __get_dataset_size(data):
 
 
 def __get_pretty_dataset_size(data):
+    """
+    Retrieves the 'pretty_size' attribute from a JSON data dictionary.
+
+    Args:
+        data (dict): The JSON data dictionary.
+
+    Returns:
+        str or None: Pretty size of the dataset, or None if 'pretty_size' attribute is missing or invalid.
+    """
     try:
         return data["pretty_size"]
     except:
@@ -61,6 +112,15 @@ def __get_pretty_dataset_size(data):
 
 
 def __get_creation_date(data):
+    """
+    Retrieves the 'creation_date' attribute from a JSON data dictionary.
+
+    Args:
+        data (dict): The JSON data dictionary.
+
+    Returns:
+        str or None: Creation date of the dataset, or None if 'creation_date' attribute is missing or invalid.
+    """
     try:
         return data["creation_date"]
     except:
@@ -68,12 +128,32 @@ def __get_creation_date(data):
 
 
 def __update_dataframe(dataset, temp, key):
+    """
+    Update a DataFrame ('dataset') with values from another DataFrame ('temp') based on a specified 'key'.
+
+    Args:
+        dataset (pandas.DataFrame): The target DataFrame to be updated.
+        temp (pandas.DataFrame): The DataFrame containing updated values.
+        key (str): The column key used for updating.
+
+    Returns:
+        pandas.DataFrame: The updated DataFrame ('dataset').
+    """
     for index, datum in temp.iterrows():
         dataset.loc[index, key] = temp.loc[index, key]
     return dataset
 
 
 def __get_files(directory):
+    """
+    Retrieves a list of files within a directory using the 'lfs find' command.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        list: A list of file paths within the directory.
+    """
     files = subprocess.check_output(["lfs", "find", "-type", "f", directory])
     files = str(files)
     files = files.replace("b'/bil/data/", "/bil/data/")
@@ -83,10 +163,28 @@ def __get_files(directory):
 
 
 def __get_number_of_files(directory):
+    """
+    Retrieves the number of files within a directory.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        int: The number of files within the directory.
+    """
     return len(__get_files(directory))
 
 
 def generate_dataset_uuid(directory):
+    """
+    Generates a UUID for a given directory path.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        str: The generated UUID.
+    """
     if directory[-1] == "/":
         directory = directory[:-1]
 
@@ -94,10 +192,28 @@ def generate_dataset_uuid(directory):
 
 
 def exists(directory):
+    """
+    Checks if a directory exists.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        bool: True if the directory exists, False otherwise.
+    """
     return Path(directory).exists()
 
 
 def __get_temp_file(directory):
+    """
+    Generates a temporary file path based on a directory path.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        str or None: The temporary file path, or None if the file does not exist.
+    """
     if directory[-1] == "/":
         directory = directory[:-1]
     file = directory.replace("/", "_")
@@ -110,6 +226,15 @@ def __get_temp_file(directory):
 
 
 def __get_json_file(directory):
+    """
+    Generates a JSON file path based on a directory path using a generated UUID.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        str or None: The JSON file path, or None if the file does not exist.
+    """
     dataset_uuid = generate_dataset_uuid(directory)
     output_filename = f"/bil/data/inventory/{dataset_uuid}.json"
 
@@ -120,11 +245,20 @@ def __get_json_file(directory):
 
 
 def __get_md5_coverage(directory):
+    """
+    Calculates coverage based on the 'md5' hash from a DataFrame.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        float or None: Coverage percentage of 'md5' hash, or None if unable to process.
+    """
     try:
         output_filename = __get_temp_file(directory)
         if output_filename is not None and Path(output_filename).exists():
             df = pd.read_csv(output_filename, sep="\t", low_memory=False)
-            if "md5" in df.keys():
+            if "md5" in df.columns:
                 return (len(df) - df["md5"].isnull().sum()) / len(df)
             else:
                 return 0
@@ -136,27 +270,20 @@ def __get_md5_coverage(directory):
 
 
 def __get_sha256_coverage(directory):
+    """
+    Calculates coverage based on the 'sha256' hash from a DataFrame.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        float or None: Coverage percentage of 'sha256' hash, or None if unable to process.
+    """
     try:
         output_filename = __get_temp_file(directory)
         if output_filename is not None and Path(output_filename).exists():
             df = pd.read_csv(output_filename, sep="\t", low_memory=False)
-            if "sha256" in df.keys():
-                return (len(df) - df["sha256"].isnull().sum()) / len(df)
-            else:
-                return 0
-        else:
-            return 0
-    except:
-        print(f"Unable to process file {output_filename}")
-        return None
-
-
-def __get_sha256_coverage(directory):
-    try:
-        output_filename = __get_temp_file(directory)
-        if output_filename is not None and Path(output_filename).exists():
-            df = pd.read_csv(output_filename, sep="\t", low_memory=False)
-            if "sha256" in df.keys():
+            if "sha256" in df.columns:
                 return (len(df) - df["sha256"].isnull().sum()) / len(df)
             else:
                 return 0
@@ -168,11 +295,20 @@ def __get_sha256_coverage(directory):
 
 
 def __get_xxh64_coverage(directory):
+    """
+    Calculates coverage based on the 'xxh64' hash from a DataFrame.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        float or None: Coverage percentage of 'xxh64' hash, or None if unable to process.
+    """
     try:
         output_filename = __get_temp_file(directory)
         if output_filename is not None and Path(output_filename).exists():
             df = pd.read_csv(output_filename, sep="\t", low_memory=False)
-            if "xxh64" in df.keys():
+            if "xxh64" in df.columns:
                 return (len(df) - df["xxh64"].isnull().sum()) / len(df)
             else:
                 return 0
@@ -184,17 +320,25 @@ def __get_xxh64_coverage(directory):
 
 
 def __compute_score(datum):
+    """
+    Computes a score based on attributes in a 'datum' dictionary.
+
+    Args:
+        datum (dict): The data dictionary containing attributes.
+
+    Returns:
+        float: Computed score based on specified attributes.
+    """
     score = 0
+
     if "json_file" in datum.keys() and datum["json_file"] is not None:
-        score = score + 1
+        score += 1
 
     if "md5_coverage" in datum.keys():
-        score = (
-            score
-            + datum["md5_coverage"]
-            + datum["sha256_coverage"]
-            + datum["xxh64_coverage"]
-        ) / 4.0
+        coverage_sum = (
+            datum["md5_coverage"] + datum["sha256_coverage"] + datum["xxh64_coverage"]
+        )
+        score = coverage_sum / 4.0
 
     return score
 

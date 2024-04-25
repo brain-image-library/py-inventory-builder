@@ -1,3 +1,4 @@
+import random
 import xxhash
 import argparse
 import datetime
@@ -88,6 +89,7 @@ def __create_checkpoint_file(filename):
 
 def __remove_checkpoint_file(filename):
     # Create a Path object for the specified filename
+    print(f"Checking the existence of checkpoint file {filename}")
     file_path = Path(filename)
 
     # Check if the file exists
@@ -303,6 +305,43 @@ def __get_filetype(extension):
         return "tracing"
 
     return "other"
+
+
+def get_random_movie_quote():
+    # List of famous movie quotes
+    quotes = [
+        "May the Force be with you. - Star Wars\n",
+        "Here's looking at you, kid. - Casablanca\n",
+        "I'll be back. - The Terminator\n",
+        "You can't handle the truth! - A Few Good Men\n",
+        "Go ahead, make my day. - Sudden Impact\n",
+        "Life is like a box of chocolates. You never know what you're gonna get. - Forrest Gump\n",
+        "There's no place like home. - The Wizard of Oz\n",
+        "Keep your friends close, but your enemies closer. - The Godfather Part II\n",
+        "I see dead people. - The Sixth Sense\n",
+        "You talking to me? - Taxi Driver\n",
+        "To infinity and beyond! - Toy Story\n",
+        "You can't sit with us! - Mean Girls\n",
+        "You're gonna need a bigger boat. - Jaws\n",
+        "Just keep swimming. - Finding Nemo\n",
+        "Say hello to my little friend! - Scarface\n",
+        "Houston, we have a problem. - Apollo 13\n",
+        "I am your father. - The Empire Strikes Back\n",
+        "You shall not pass! - The Lord of the Rings: The Fellowship of the Ring\n",
+        "Hasta la vista, baby. - Terminator 2: Judgment Day\n",
+        "Frankly, my dear, I don't give a damn. - Gone with the Wind\n",
+        "E.T. phone home. - E.T. the Extra-Terrestrial\n",
+        "You're killing me, Smalls. - The Sandlot\n",
+        "Why so serious? - The Dark Knight\n",
+        "I'm king of the world! - Titanic\n",
+        "I am Iron Man. - Iron Man\n",
+        "I'll have what she's having. - When Harry Met Sally\n",
+        "Show me the money! - Jerry Maguire\n",
+        "Nobody puts Baby in a corner. - Dirty Dancing\n",
+    ]
+
+    # Randomly select a quote from the list
+    return random.choice(quotes)
 
 
 def __get_url(filename):
@@ -767,7 +806,6 @@ if not metadata[metadata["bildirectory"] == directory].empty:
     ].values[0]
 
 __to_json(df, directory)
-
 __remove_checkpoint_file(checkpoint)
 __create_checkpoint_file(done)
-print("Done.\n")
+print(get_random_movie_quote())

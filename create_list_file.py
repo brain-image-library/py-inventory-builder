@@ -4,6 +4,7 @@ from pathlib import Path
 import traceback
 import uuid
 import subprocess
+import sys
 import json
 import humanize
 from typing import List
@@ -120,7 +121,7 @@ def __get_manifest(file: str) -> Any:
     :rtype: Any
     """
     temp_file = f"/tmp/{uuid.uuid4()}.json"
-    command = f"cat {file} | jq '.manifest' > {temp_file}"
+    command = f"cat {file} | /bil/packages/jq/1.6/jq '.manifest' > {temp_file}"
     subprocess.run(
         command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
@@ -233,6 +234,7 @@ def main():
 
     # Get a list of JSON files
     files = get_files(input_directory, "json")
+    print(f"Number of files found is {len(files)}")
 
     # Create the output directory if it doesn't exist
     if not Path(output_directory).exists():
@@ -242,9 +244,10 @@ def main():
     summaries = []
     for file in files:
         if str(file) == "/bil/data/inventory/list.json":
-            print("Ignoring list.json")
+            print("Ignoring computation. File list.json is found on disk.")
         else:
             try:
+                print(f"Processing manifest {file}.")
                 output_file = f"{output_directory}/{file.name}"
 
                 if not Path(output_file).exists():
@@ -280,6 +283,13 @@ def main():
 
     # Specify the path to the output JSON file
     output_file = f"/bil/data/inventory/list.json"
+
+    # Write the list of dictionaries to the JSON file
+    with open(output_file, "w") as json_file:
+        json.dump(summaries, json_file, indent=4)
+
+    # Specify the path to the output JSON file
+    output_file = f"list.json"
 
     # Write the list of dictionaries to the JSON file
     with open(output_file, "w") as json_file:

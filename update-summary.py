@@ -1,3 +1,4 @@
+import brainimagelibrary as brainzzz
 import subprocess
 import uuid
 from datetime import datetime
@@ -150,13 +151,50 @@ def __get_sha256_coverage(directory):
         return None
 
 
+def __get_sha256_coverage(directory):
+    try:
+        output_filename = __get_temp_file(directory)
+        if output_filename is not None and Path(output_filename).exists():
+            df = pd.read_csv(output_filename, sep="\t", low_memory=False)
+            if "sha256" in df.keys():
+                return (len(df) - df["sha256"].isnull().sum()) / len(df)
+            else:
+                return 0
+        else:
+            return 0
+    except:
+        print(f"Unable to process file {output_filename}")
+        return None
+
+
+def __get_xxh64_coverage(directory):
+    try:
+        output_filename = __get_temp_file(directory)
+        if output_filename is not None and Path(output_filename).exists():
+            df = pd.read_csv(output_filename, sep="\t", low_memory=False)
+            if "xxh64" in df.keys():
+                return (len(df) - df["xxh64"].isnull().sum()) / len(df)
+            else:
+                return 0
+        else:
+            return 0
+    except:
+        print(f"Unable to process file {output_filename}")
+        return None
+
+
 def __compute_score(datum):
     score = 0
     if "json_file" in datum.keys() and datum["json_file"] is not None:
         score = score + 1
 
     if "md5_coverage" in datum.keys():
-        score = (score + datum["md5_coverage"] + datum["sha256_coverage"]) / 3.0
+        score = (
+            score
+            + datum["md5_coverage"]
+            + datum["sha256_coverage"]
+            + datum["xxh64_coverage"]
+        ) / 4.0
 
     return score
 
@@ -176,34 +214,11 @@ if Path("/bil/data/inventory").exists():
         sys.exit()
 
 __pprint(f"Processing summary metadata from brainimagelibrary.org")
-url = "https://submit.brainimagelibrary.org/search/summarymetadata"
-temp_file = Path(f"/tmp/summarymetadata.csv")
-
-if temp_file.exists():
-    temp_file.unlink()
-
 ncores = 25
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 
-response = requests.get(url)
-temp_file.write_bytes(response.content)
-
-df = pd.read_csv(temp_file, sep=",", low_memory=False)
-if df.keys()[0] == "<html>":
-    print(f"File is empty. More than likely the submit VM is down.")
-    print(f"Attempting to load backup file, if it exists.")
-    if Path("/bil/data/inventory").exists():
-        now = datetime.now()
-        report_output_directory = "/bil/data/inventory/daily"
-        report_output_filename = (
-            f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.csv'
-        )
-        if Path(report_output_filename).exists():
-            temp_file = report_output_filename
-            df = pd.read_csv(temp_file, sep=",", low_memory=False)
-        else:
-            print(f"Unable to find file {report_output_filename}. Exiting program.")
-            sys.exit()
+report = brainzzz.reports.__create_daily_report()
+df = pd.DataFrame(report)
 
 ##clean dataframe
 if "title" in df.keys():
@@ -232,11 +247,11 @@ for index, row in tqdm(df.iterrows()):
 print("\nGetting number of files")
 df["number_of_files"] = df["bildirectory"].parallel_apply(__get_number_of_files)
 
-# print("\nGetting file types")
-# df["file_types"] = df["json_file"].parallel_apply(__get_file_types)
+print("\nGetting file types")
+df["file_types"] = df["json_file"].parallel_apply(__get_file_types)
 
-# print("\nGetting frequencies")
-# df["frequencies"] = df["json_file"].parallel_apply(__get_frequencies)
+print("\nGetting frequencies")
+df["frequencies"] = df["json_file"].parallel_apply(__get_frequencies)
 
 print("\nComputing temp file filename")
 df["temp_file"] = df["bildirectory"].parallel_apply(__get_temp_file)
@@ -246,6 +261,9 @@ df["md5_coverage"] = df["bildirectory"].parallel_apply(__get_md5_coverage)
 
 print("\nComputing SHA256 coverage")
 df["sha256_coverage"] = df["bildirectory"].parallel_apply(__get_sha256_coverage)
+
+print("\nComputing xxh64 coverage")
+df["xxh64_coverage"] = df["bildirectory"].parallel_apply(__get_xxh64_coverage)
 
 print("\nComputing dataset score")
 for index, datum in df.iterrows():
@@ -258,22 +276,7 @@ df.to_csv("summary_metadata.tsv", sep="\t", index=False)
 
 # saves to public directory
 if Path("/bil/data/inventory").exists():
-    print("Backing up data to /bil/data/inventory")
-    now = datetime.now()
-    report_output_directory = "/bil/data/inventory/daily/reports"
-    report_output_filename = (
-        f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.tsv'
-    )
-    df.to_csv(report_output_filename, sep="\t", index=False)
-
-    symlink_file = f"{report_output_directory}/today.tsv"
-    if Path(symlink_file).exists():
-        Path(symlink_file).unlink()
-
-    command = f"ln -s {report_output_filename} {symlink_file}"
-    print(command)
-    output = subprocess.check_output(command, shell=True)
-
+    print("Creating JSON")
     now = datetime.now()
     report_output_directory = "/bil/data/inventory/daily/reports"
     report_output_filename = (
@@ -288,6 +291,26 @@ if Path("/bil/data/inventory").exists():
     command = f"ln -s {report_output_filename} {symlink_file}"
     print(command)
     output = subprocess.check_output(command, shell=True)
+
+    print("Backing up data to /bil/data/inventory")
+    print("Creating TSV file")
+    df.drop(columns=["file_types", "frequencies"], inplace=True)
+    now = datetime.now()
+
+    report_output_directory = "/bil/data/inventory/daily/reports"
+    report_output_filename = (
+        f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.tsv'
+    )
+
+    command = f"ln -s {report_output_filename} {symlink_file}"
+    print(command)
+    output = subprocess.check_output(command, shell=True)
+
+    symlink_file = f"{report_output_directory}/today.tsv"
+    if Path(symlink_file).exists():
+        Path(symlink_file).unlink()
+
+    df.to_csv(report_output_filename, sep="\t", index=False)
 
 print("Exporting dataframe to Excel spreadsheet")
 now = datetime.now()

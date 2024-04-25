@@ -7,6 +7,12 @@ import time
 import argparse
 import subprocess
 from pandarallel import pandarallel
+from pathlib import Path
+
+
+def __get_file_size(filename):
+    return Path(filename).stat().st_size
+
 
 def compute_sha256sum(filename):
     BUF_SIZE = 65536
@@ -27,6 +33,7 @@ def compute_sha256sum(filename):
 
         return {
             "filename": filename,
+            "size": __get_file_size(filename),
             "threads": 1,
             "elapsed_time": elapsed_time,
             "sha256": sha256.hexdigest(),
@@ -93,13 +100,32 @@ pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 
 files = __get_files(directory)
 
+file = "sha256.tsv"
+
+if Path(file).exists():
+    df = pd.read_csv(file, sep="\t")
+else:
+    columns = ["filenames", "threads", "elapsed_time", "sha256"]
+    df = pd.DataFrame(columns=columns)
+
 data = []
+counter = 0
 for file in tqdm(files):
+    counter = counter + 1
+    data.append(__get_file_size(file))
     data.append(compute_sha256sum_threaded(file))
 
+    if counter % 100 == 0:
+        df.to_csv(file, sep="\t", index=False, mode="a")
+
+df.to_csv(file, sep="\t", index=False, mode="a")
+
 for file in tqdm(files):
+    counter = counter + 1
+    data.append(__get_file_size(file))
     data.append(compute_sha256sum(file))
 
-df = pd.DataFrame(data)
-file = "sha256.tsv"
-df.to_csv(file, sep="\t", index=False, mode="a", header=df)
+    if counter % 100 == 0:
+        df.to_csv(file, sep="\t", index=False, mode="a")
+
+df.to_csv(file, sep="\t", index=False, mode="a")

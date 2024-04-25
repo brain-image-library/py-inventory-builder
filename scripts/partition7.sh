@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -p validation
+#SBATCH -p compute
 #SBATCH -n 20
 #SBATCH --mem=128G
 

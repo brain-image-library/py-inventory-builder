@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -p validation
+#SBATCH -p compute
 #SBATCH -n 30
 #SBATCH --mem=60000M
 

@@ -47,36 +47,82 @@ def __get_data(json_file):
         return {}
 
 
-def __get_file_types(data):
+def __get_mime_types(filename):
     """
-    Retrieves the 'file_types' attribute from a JSON data dictionary.
+    Extracts MIME type frequencies from a JSON file containing 'manifest' data.
 
-    Args:
-        data (dict): The JSON data dictionary.
+    Parameters:
+    filename (str): Path to the JSON file containing 'manifest' data.
 
     Returns:
-        list or None: List of file types, or None if 'file_types' attribute is missing or invalid.
+    dict: A dictionary where keys are MIME types and values are their respective frequencies.
+          The frequencies represent the number of occurrences of each MIME type in the file.
     """
-    try:
-        return data["file_types"]
-    except:
-        return None
+
+    # Load JSON data from file
+    with open(filename, "r") as f:
+        json_data = json.load(f)
+
+    # Extract the 'manifest' field into a DataFrame
+    data = json_data["manifest"]
+    df = pd.DataFrame(data)
+
+    # Count occurrences of each MIME type and convert to dictionary
+    mime_type_counts = df["mimetype"].value_counts().to_dict()
+
+    return mime_type_counts
 
 
-def __get_frequencies(data):
+def __get_file_types(filename):
     """
-    Retrieves the 'frequencies' attribute from a JSON data dictionary.
+    Extracts file type frequencies from a JSON file containing 'manifest' data.
 
-    Args:
-        data (dict): The JSON data dictionary.
+    Parameters:
+    filename (str): Path to the JSON file containing 'manifest' data.
 
     Returns:
-        dict or None: Dictionary of frequencies, or None if 'frequencies' attribute is missing or invalid.
+    dict: A dictionary where keys are file types and values are their respective frequencies.
+          The frequencies represent the number of occurrences of each file type in the file.
     """
-    try:
-        return data["frequencies"]
-    except:
-        return None
+
+    # Load JSON data from file
+    with open(filename, "r") as f:
+        json_data = json.load(f)
+
+    # Extract the 'manifest' field into a DataFrame
+    data = json_data["manifest"]
+    df = pd.DataFrame(data)
+
+    # Count occurrences of each file type and convert to dictionary
+    file_type_counts = df["filetype"].value_counts().to_dict()
+
+    return file_type_counts
+
+
+def __get_frequencies(filename):
+    """
+    Extracts frequencies of file extensions from a JSON file containing 'manifest' data.
+
+    Parameters:
+    filename (str): Path to the JSON file containing 'manifest' data.
+
+    Returns:
+    dict: A dictionary where keys are file extensions and values are their respective frequencies.
+          The frequencies represent the number of occurrences of each file extension in the file.
+    """
+
+    # Load JSON data from file
+    with open(filename, "r") as f:
+        json_data = json.load(f)
+
+    # Extract the 'manifest' field into a DataFrame
+    data = json_data["manifest"]
+    df = pd.DataFrame(data)
+
+    # Count occurrences of each file extension and convert to dictionary
+    extension_counts = df["extension"].value_counts().to_dict()
+
+    return extension_counts
 
 
 def __get_dataset_size(data):
@@ -394,8 +440,11 @@ df["number_of_files"] = df["bildirectory"].parallel_apply(__get_number_of_files)
 print("\nGetting file types")
 df["file_types"] = df["json_file"].parallel_apply(__get_file_types)
 
-print("\nGetting frequencies")
+print("\nGetting file frequencies")
 df["frequencies"] = df["json_file"].parallel_apply(__get_frequencies)
+
+print("\nGetting file frequencies")
+df["frequencies"] = df["json_file"].parallel_apply(__get_mime_types)
 
 print("\nComputing temp file filename")
 df["temp_file"] = df["bildirectory"].parallel_apply(__get_temp_file)

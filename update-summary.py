@@ -1,3 +1,5 @@
+import pymongo
+import pdb
 import brainimagelibrary as brainzzz
 import subprocess
 import uuid
@@ -5,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 import sys
 import json
+import traceback
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -59,18 +62,22 @@ def __get_mime_types(filename):
           The frequencies represent the number of occurrences of each MIME type in the file.
     """
 
-    # Load JSON data from file
-    with open(filename, "r") as f:
-        json_data = json.load(f)
+    try:
+        # Load JSON data from file
+        with open(filename, "r") as f:
+            json_data = json.load(f)
 
-    # Extract the 'manifest' field into a DataFrame
-    data = json_data["manifest"]
-    df = pd.DataFrame(data)
+        # Extract the 'manifest' field into a DataFrame
+        data = json_data["manifest"]
+        df = pd.DataFrame(data)
 
-    # Count occurrences of each MIME type and convert to dictionary
-    mime_type_counts = df["mimetype"].value_counts().to_dict()
+        # Count occurrences of each MIME type and convert to dictionary
+        mime_type_counts = df["mime-type"].value_counts().to_dict()
 
-    return mime_type_counts
+        return mime_type_counts
+    except:
+        traceback.print_exc()
+        return {}
 
 
 def __get_file_types(filename):
@@ -85,18 +92,21 @@ def __get_file_types(filename):
           The frequencies represent the number of occurrences of each file type in the file.
     """
 
-    # Load JSON data from file
-    with open(filename, "r") as f:
-        json_data = json.load(f)
+    try:
+        # Load JSON data from file
+        with open(filename, "r") as f:
+            json_data = json.load(f)
 
-    # Extract the 'manifest' field into a DataFrame
-    data = json_data["manifest"]
-    df = pd.DataFrame(data)
+        # Extract the 'manifest' field into a DataFrame
+        data = json_data["manifest"]
+        df = pd.DataFrame(data)
 
-    # Count occurrences of each file type and convert to dictionary
-    file_type_counts = df["filetype"].value_counts().to_dict()
+        # Count occurrences of each file type and convert to dictionary
+        file_type_counts = df["filetype"].value_counts().to_dict()
 
-    return file_type_counts
+        return file_type_counts
+    except:
+        return None
 
 
 def __get_frequencies(filename):
@@ -111,18 +121,21 @@ def __get_frequencies(filename):
           The frequencies represent the number of occurrences of each file extension in the file.
     """
 
-    # Load JSON data from file
-    with open(filename, "r") as f:
-        json_data = json.load(f)
+    try:
+        # Load JSON data from file
+        with open(filename, "r") as f:
+            json_data = json.load(f)
 
-    # Extract the 'manifest' field into a DataFrame
-    data = json_data["manifest"]
-    df = pd.DataFrame(data)
+        # Extract the 'manifest' field into a DataFrame
+        data = json_data["manifest"]
+        df = pd.DataFrame(data)
 
-    # Count occurrences of each file extension and convert to dictionary
-    extension_counts = df["extension"].value_counts().to_dict()
+        # Count occurrences of each file extension and convert to dictionary
+        extension_counts = df["extension"].value_counts().to_dict()
 
-    return extension_counts
+        return extension_counts
+    except:
+        return {}
 
 
 def __get_dataset_size(data):
@@ -410,6 +423,9 @@ pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 report = brainzzz.reports.__create_daily_report()
 df = pd.DataFrame(report)
 
+# sample some rows for testing
+# df = df.sample(frac=0.1, replace=True, random_state=1)
+
 ##clean dataframe
 if "title" in df.keys():
     df = df.drop("title", axis=1)
@@ -434,8 +450,8 @@ for index, row in tqdm(df.iterrows()):
     df.loc[index, "size"] = __get_dataset_size(data)
     df.loc[index, "pretty_size"] = __get_pretty_dataset_size(data)
 
-print("\nGetting number of files")
-df["number_of_files"] = df["bildirectory"].parallel_apply(__get_number_of_files)
+# print("\nGetting number of files")
+# df["number_of_files"] = df["bildirectory"].parallel_apply(__get_number_of_files)
 
 print("\nGetting file types")
 df["file_types"] = df["json_file"].parallel_apply(__get_file_types)
@@ -443,8 +459,8 @@ df["file_types"] = df["json_file"].parallel_apply(__get_file_types)
 print("\nGetting file frequencies")
 df["frequencies"] = df["json_file"].parallel_apply(__get_frequencies)
 
-print("\nGetting file frequencies")
-df["frequencies"] = df["json_file"].parallel_apply(__get_mime_types)
+print("\nGetting file mime-types")
+df["mime_types"] = df["json_file"].parallel_apply(__get_mime_types)
 
 print("\nComputing temp file filename")
 df["temp_file"] = df["bildirectory"].parallel_apply(__get_temp_file)
@@ -481,7 +497,7 @@ if Path("/bil/data/inventory").exists():
     if Path(symlink_file).exists():
         Path(symlink_file).unlink()
 
-    command = f"ln -s {report_output_filename} {symlink_file}"
+    command = f"rm -fv {symlink_file} & ln -s {report_output_filename} {symlink_file}"
     print(command)
     output = subprocess.check_output(command, shell=True)
 
@@ -495,7 +511,7 @@ if Path("/bil/data/inventory").exists():
         f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.tsv'
     )
 
-    command = f"ln -s {report_output_filename} {symlink_file}"
+    command = f"rm -fv {symlink_file} & ln -s {report_output_filename} {symlink_file}"
     print(command)
     output = subprocess.check_output(command, shell=True)
 

@@ -29,6 +29,7 @@ import pandas as pd
 import tabulate
 from pandarallel import pandarallel
 from tqdm import tqdm
+import zipfile
 
 
 def pprint(msg):
@@ -307,43 +308,6 @@ def __get_filetype(extension):
     return "other"
 
 
-def get_random_movie_quote():
-    # List of famous movie quotes
-    quotes = [
-        "May the Force be with you. - Star Wars\n",
-        "Here's looking at you, kid. - Casablanca\n",
-        "I'll be back. - The Terminator\n",
-        "You can't handle the truth! - A Few Good Men\n",
-        "Go ahead, make my day. - Sudden Impact\n",
-        "Life is like a box of chocolates. You never know what you're gonna get. - Forrest Gump\n",
-        "There's no place like home. - The Wizard of Oz\n",
-        "Keep your friends close, but your enemies closer. - The Godfather Part II\n",
-        "I see dead people. - The Sixth Sense\n",
-        "You talking to me? - Taxi Driver\n",
-        "To infinity and beyond! - Toy Story\n",
-        "You can't sit with us! - Mean Girls\n",
-        "You're gonna need a bigger boat. - Jaws\n",
-        "Just keep swimming. - Finding Nemo\n",
-        "Say hello to my little friend! - Scarface\n",
-        "Houston, we have a problem. - Apollo 13\n",
-        "I am your father. - The Empire Strikes Back\n",
-        "You shall not pass! - The Lord of the Rings: The Fellowship of the Ring\n",
-        "Hasta la vista, baby. - Terminator 2: Judgment Day\n",
-        "Frankly, my dear, I don't give a damn. - Gone with the Wind\n",
-        "E.T. phone home. - E.T. the Extra-Terrestrial\n",
-        "You're killing me, Smalls. - The Sandlot\n",
-        "Why so serious? - The Dark Knight\n",
-        "I'm king of the world! - Titanic\n",
-        "I am Iron Man. - Iron Man\n",
-        "I'll have what she's having. - When Harry Met Sally\n",
-        "Show me the money! - Jerry Maguire\n",
-        "Nobody puts Baby in a corner. - Dirty Dancing\n",
-    ]
-
-    # Randomly select a quote from the list
-    return random.choice(quotes)
-
-
 def __get_url(filename):
     filename = str(filename)
     return filename.replace("/bil/data/", "https://download.brainimagelibrary.org/")
@@ -398,6 +362,30 @@ def __to_json(df, directory):
             f.write(str(dataset))
 
 
+def __to_zip(df, bildid, directory):
+    df["fullpath"] = df["fullpath"].astype(str)
+    files = df.to_dict("records")
+    dataset["manifest"] = files
+
+    temp_filename = f"{bildid}.zip"
+
+    output_filename = f"zip/{bildid}.zip"
+    # Save the DataFrame as a TSV file and compress it into a ZIP
+    with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
+        with zipf.open(output_filename, "w") as tsv_file:
+            df.to_csv(temp_filename, sep="\t", index=False)
+
+    print(f"Saving results to {output_filename}.")
+
+    output_filename = f"/bil/data/inventory/{bildid}.zip"
+    # Save the DataFrame as a TSV file and compress it into a ZIP
+    with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
+        with zipf.open(output_filename, "w") as tsv_file:
+            df.to_csv(temp_filename, sep="\t", index=False)
+
+    print(f"Saving results to {output_filename}.")
+
+
 ###############################################################################################################
 # Load file with files on directory
 parser = argparse.ArgumentParser()
@@ -410,6 +398,12 @@ parser.add_argument(
 )
 parser.add_argument(
     "--compress", action=argparse.BooleanOptionalAction, dest="compress", default=False
+)
+parser.add_argument(
+    "--remove-checkpoints",
+    action=argparse.BooleanOptionalAction,
+    dest="remove_checkpoints",
+    default=False,
 )
 parser.add_argument(
     "--rebuild", action=argparse.BooleanOptionalAction, dest="rebuild", default=False
@@ -431,6 +425,7 @@ directory = args.directory
 update_json_file_on_bil_data = bool(args.update)
 compress_json_file_on_bil_data = bool(args.compress)
 avoid_checksums = bool(args.avoid_checksums)
+remove_checkpoints = bool(args.remove_checkpoints)
 multi_threading = bool(args.multi_threading)
 rebuild = bool(args.rebuild)
 ncores = int(args.ncores)
@@ -454,8 +449,15 @@ if not __create_checkpoint_file(checkpoint):
     sys.exit()
 
 done = output_filename.replace(".tsv", ".done")
+
+if Path(done).exists() and remove_checkpoints:
+    print("Removing checkpoints")
+    Path(checkpoint).unlink()
+    Path(done).unlink()
+
 if Path(done).exists():
     print("The processing of this dataset is finished. Exiting.")
+    Path(checkpoint).unlink()
     sys.exit()
 
 if rebuild:
@@ -808,4 +810,3 @@ if not metadata[metadata["bildirectory"] == directory].empty:
 __to_json(df, directory)
 __remove_checkpoint_file(checkpoint)
 __create_checkpoint_file(done)
-print(get_random_movie_quote())

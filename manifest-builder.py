@@ -406,7 +406,21 @@ def __to_json(df, directory):
         with gzip.open(f"{output_filename}.gz", "wt") as f:
             f.write(str(dataset))
 
+#####################################################################################
+def __to_metadata(data, bildid):
+    # Create the "zip" directory if it does not exist
+    zip_dir = Path.cwd() / "metadata"
+    zip_dir.mkdir(parents=True, exist_ok=True)
 
+    # Define temporary TSV filename and ZIP file paths
+    output_filename = zip_dir / f"{bildid}.json"
+
+    with open(output_filename, "w") as temp_file:
+        json.dump(data, temp_file, indent=4)
+
+    print(f"Saved metadata TSV file to {output_filename}.")
+
+#####################################################################################
 def __to_zip(df, bildid, directory):
     """
     Save a DataFrame to a ZIP file containing a TSV file.
@@ -866,8 +880,8 @@ dataset["dataset_uuid"] = __generate_dataset_uuid(directory)
 dataset["creation_date"] = __get_directory_creation_date(directory)
 dataset["directory"] = directory
 dataset["download_url"] = __get_url(dataset["directory"])
-dataset["number_of_files"] = len(df)
-dataset["size"] = df["size"].sum()
+dataset["number_of_files"] = int(len(df))
+dataset["size"] = int(df["size"].sum())
 dataset["pretty_size"] = humanize.naturalsize(dataset["size"], gnu=True)
 dataset["frequencies"] = df["extension"].value_counts().to_dict()
 dataset["file_types"] = df["filetype"].value_counts().to_dict()
@@ -913,6 +927,7 @@ if not metadata[metadata["bildirectory"] == directory].empty:
     ].values[0]
 
 __to_json(df, directory)
+__to_metadata(dataset, dataset["bildid"])
 __to_zip(df, dataset["bildid"], directory)
 __remove_checkpoint_file(checkpoint)
 __create_checkpoint_file(done)

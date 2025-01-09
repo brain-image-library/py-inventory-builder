@@ -39,8 +39,6 @@ modules = [
     "hashlib",
     "concurrent.futures",
     "compress_json",
-    "numpy",
-    "pandas",
     "tabulate",
     "pandarallel",
     "tqdm",
@@ -50,6 +48,9 @@ modules = [
 # Attempt to import each module safely
 for module in modules:
     safe_import(module)
+
+import pandas as pd
+import numpy as np
 
 # Explicit imports for modules that use submodules
 from concurrent.futures import ProcessPoolExecutor
@@ -407,7 +408,7 @@ def __to_zip(df, bildid, directory):
     df["fullpath"] = df["fullpath"].astype(str)
 
     # Create the "zip" directory if it does not exist
-    zip_dir = Path(directory) / "zip"
+    zip_dir = Path.cwd() / "zip"
     zip_dir.mkdir(parents=True, exist_ok=True)
 
     # Define temporary TSV filename and ZIP file paths
@@ -426,14 +427,6 @@ def __to_zip(df, bildid, directory):
     # Clean up the temporary TSV file
     temp_filename.unlink()
     print(f"Deleted temporary TSV file: {temp_filename}.")
-
-    # Optionally save the ZIP file to another location
-    if Path("/bil/data/inventory/datasets/").exists():
-        external_output_filename = Path(f"/bil/data/inventory/datasets/{bildid}.zip")
-        external_output_filename.parent.mkdir(parents=True, exist_ok=True)
-        output_filename.rename(external_output_filename)
-        print(f"Moved ZIP file to {external_output_filename}.")
-
 
 ###############################################################################################################
 # Load file with files on directory
@@ -619,7 +612,7 @@ if not avoid_checksums:
             files = df[df["md5"].isnull()]
         else:
             files = df
-        print(f"Number of files to process is {str(len(files))}")
+        print(f"Number of files to process is {str(len(files))}.")
 
         if len(files) > 0:
             if multi_threading:
@@ -639,7 +632,7 @@ if not avoid_checksums:
 
         if len(files) != 0:
             n = __get_chunk_size(files)
-            print(f"Number of files to process is {str(len(files))}")
+            print(f"Number of files to process is {str(len(files))}.")
             if n < 25:
                 if multi_threading:
                     files["md5"] = files["fullpath"].parallel_apply(
@@ -687,7 +680,7 @@ if not avoid_checksums:
             files = df[df["xxh64"].isnull()]
         else:
             files = df
-        print(f"Number of files to process is {str(len(files))}")
+        print(f"Number of files to process is {str(len(files))}.")
 
         if len(files) > 0:
             files["xxh64"] = files["fullpath"].parallel_apply(__compute_xxh64sum)
@@ -702,7 +695,7 @@ if not avoid_checksums:
 
         if len(files) != 0:
             n = __get_chunk_size(files)
-            print(f"Number of files to process is {str(len(files))}")
+            print(f"Number of files to process is {str(len(files))}.")
             if n < 25:
                 files["xxh64"] = files["fullpath"].parallel_apply(__compute_xxh64sum)
 
@@ -739,7 +732,7 @@ if not avoid_checksums:
             files = df[df["sha256"].isnull()]
         else:
             files = df
-        print(f"Number of files to process is {str(len(files))}")
+        print(f"Number of files to process is {str(len(files))}.")
 
         if len(files) > 0:
             if multi_threading:
@@ -759,7 +752,7 @@ if not avoid_checksums:
 
         if not files.empty:
             n = __get_chunk_size(files)
-            print(f"Number of files to process is {str(len(files))}")
+            print(f"Number of files to process is {str(len(files))}.")
 
             if n < 25:
                 if multi_threading:

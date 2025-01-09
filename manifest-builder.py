@@ -168,6 +168,18 @@ def __compute_xxh64sum(filename):
         raise e
 
 
+def __compute_b2sum(filename):
+    hash_blake2b = hashlib.blake2b()
+    buffer_size = 8192  # Read the file in chunks of 8KB
+
+    if Path(filename).is_file() or Path(filename).is_symlink():
+        with open(filename, "rb") as f:
+            while chunk := f.read(buffer_size):
+                hash_blake2b.update(chunk)
+
+    return hash_blake2b.hexdigest()
+
+
 def __compute_sha256sum(filename):
     # BUF_SIZE is totally arbitrary, change for your app!
     BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
@@ -427,6 +439,7 @@ def __to_zip(df, bildid, directory):
     # Clean up the temporary TSV file
     temp_filename.unlink()
     print(f"Deleted temporary TSV file: {temp_filename}.")
+
 
 ###############################################################################################################
 # Load file with files on directory
@@ -713,6 +726,57 @@ if not avoid_checksums:
                     )
 
                     df = __update_dataframe(df, chunk, "xxh64")
+                    chunk_counter = chunk_counter + 1
+
+                    if chunk_counter % 10 == 0 or chunk_counter == len(chunks):
+                        print("\nSaving chunks to disk")
+                        df.to_csv(output_filename, sep="\t", index=False)
+        else:
+            print("No files left to process.")
+
+    df.to_csv(output_filename, sep="\t", index=False)
+
+###############################################################################################################
+warnings.filterwarnings("ignore")
+if not avoid_checksums:
+    pprint("Computing b2sum checksum")
+
+    if len(df) < 100:
+        if "b2sum" in df.keys():
+            files = df[df["b2sum"].isnull()]
+        else:
+            files = df
+        print(f"Number of files to process is {str(len(files))}.")
+
+        if len(files) > 0:
+            files["b2sum"] = files["fullpath"].parallel_apply(__compute_b2sum)
+
+            df = __update_dataframe(df, files, "b2sum")
+            df.to_csv(output_filename, sep="\t", index=False)
+    else:
+        if "b2sum" in df.keys():
+            files = df[df["b2sum"].isnull()]
+        else:
+            files = df
+
+        if len(files) != 0:
+            n = __get_chunk_size(files)
+            print(f"Number of files to process is {str(len(files))}.")
+            if n < 25:
+                files["b2sum"] = files["fullpath"].parallel_apply(__compute_b2sum)
+
+                df = __update_dataframe(df, files, "b2sum")
+                df.to_csv(output_filename, sep="\t", index=False)
+            else:
+                chunks = np.array_split(files, n)
+                chunk_counter = 1
+                for chunk in chunks:
+                    print(
+                        f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}"
+                    )
+                    chunk["b2sum"] = chunk["fullpath"].parallel_apply(__compute_b2sum)
+
+                    df = __update_dataframe(df, chunk, "b2sum")
                     chunk_counter = chunk_counter + 1
 
                     if chunk_counter % 10 == 0 or chunk_counter == len(chunks):

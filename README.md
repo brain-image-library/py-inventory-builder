@@ -1,6 +1,6 @@
 # Inventory Script(s)
 
-![Diagram]('images/diagram.png')
+![Diagram](images/diagram.png)
 
 ## Description
 

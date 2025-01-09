@@ -1,35 +1,62 @@
-import random
-import xxhash
-import argparse
-import datetime
-import gzip
-import threading
-from numpyencoder import NumpyEncoder
-import hashlib
-import json
-import shutil
-import humanize
-import warnings
-import mimetypes
-import magic
-import os
-import os.path
 import sys
-import shutil
-import subprocess
-import time
-import uuid
-import warnings
-from pathlib import Path
-import hashlib
+
+
+def safe_import(module_name):
+    try:
+        globals()[module_name] = __import__(module_name)
+    except ImportError as e:
+        print(
+            f"Error: Failed to import '{module_name}'. Please install the required package."
+        )
+        sys.exit(1)
+
+
+# List of modules to import
+modules = [
+    "random",
+    "xxhash",
+    "argparse",
+    "datetime",
+    "gzip",
+    "threading",
+    "numpyencoder",
+    "hashlib",
+    "json",
+    "shutil",
+    "humanize",
+    "warnings",
+    "mimetypes",
+    "magic",
+    "os",
+    "os.path",
+    "sys",
+    "shutil",
+    "subprocess",
+    "time",
+    "uuid",
+    "warnings",
+    "pathlib",
+    "hashlib",
+    "concurrent.futures",
+    "compress_json",
+    "numpy",
+    "pandas",
+    "tabulate",
+    "pandarallel",
+    "tqdm",
+    "zipfile",
+]
+
+# Attempt to import each module safely
+for module in modules:
+    safe_import(module)
+
+# Explicit imports for modules that use submodules
 from concurrent.futures import ProcessPoolExecutor
-import compress_json
-import numpy as np
-import pandas as pd
-import tabulate
+from pathlib import Path
+from numpyencoder import NumpyEncoder
 from pandarallel import pandarallel
 from tqdm import tqdm
-import zipfile
 
 
 def pprint(msg):
@@ -368,52 +395,44 @@ def __to_json(df, directory):
 
 
 def __to_zip(df, bildid, directory):
-    df["fullpath"] = df["fullpath"].astype(str)
-    files = df.to_dict("records")
-    dataset["manifest"] = files
+    """
+    Save a DataFrame to a ZIP file containing a TSV file.
 
-    temp_filename = f"{bildid}.zip"
-
-    if not Path("zip").exists():
-        Path("zip").mkdir()
-
-    output_filename = f"zip/{bildid}.zip"
-    # Save the DataFrame as a TSV file and compress it into a ZIP
-    with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
-        with zipf.open(output_filename, "w") as tsv_file:
-            df.to_csv(temp_filename, sep="\t", index=False)
-
-    print(f"Saving results to {output_filename}.")
-
-    output_filename = f"/bil/data/inventory/datasets/{bildid}.zip"
-    # Save the DataFrame as a TSV file and compress it into a ZIP
-    with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
-        with zipf.open(output_filename, "w") as tsv_file:
-            df.to_csv(temp_filename, sep="\t", index=False)
-
-    print(f"Saving results to {output_filename}.")
-
-
-def __to_zip(df, bildid, directory):
+    Parameters:
+    - df (pd.DataFrame): The DataFrame to save.
+    - bildid (str): Identifier for the ZIP and TSV files.
+    - directory (str): Base directory where the ZIP files are stored.
+    """
     # Ensure "fullpath" column is of string type
     df["fullpath"] = df["fullpath"].astype(str)
 
-    # Define temporary and output file paths
-    temp_tsv_filename = f"{bildid}.tsv"
-    local_zip_path = "zip"
-    local_zip_path.mkdir(
-        parents=True, exist_ok=True
-    )  # Create the directory if it doesn't exist
-    local_zip_filename = f"{local_zip_path}/{bildid}.zip"
+    # Create the "zip" directory if it does not exist
+    zip_dir = Path(directory) / "zip"
+    zip_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save DataFrame to a TSV file
-    df.to_csv(temp_tsv_filename, sep="\t", index=False)
+    # Define temporary TSV filename and ZIP file paths
+    temp_filename = zip_dir / f"{bildid}.tsv"
+    output_filename = zip_dir / f"{bildid}.zip"
 
-    # Compress the TSV into a ZIP file in the local directory
-    with zipfile.ZipFile(local_zip_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
-        zipf.write(temp_tsv_filename, arcname=f"{bildid}.tsv")
+    # Save the DataFrame as a TSV file
+    df.to_csv(temp_filename, sep="\t", index=False)
+    print(f"Saved temporary TSV file to {temp_filename}.")
 
-    print(f"Saved local zip to {local_zip_filename}")
+    # Compress the TSV file into a ZIP archive
+    with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
+        zipf.write(temp_filename, arcname=f"{bildid}.tsv")
+    print(f"Saved ZIP file to {output_filename}.")
+
+    # Clean up the temporary TSV file
+    temp_filename.unlink()
+    print(f"Deleted temporary TSV file: {temp_filename}.")
+
+    # Optionally save the ZIP file to another location
+    if Path("/bil/data/inventory/datasets/").exists():
+        external_output_filename = Path(f"/bil/data/inventory/datasets/{bildid}.zip")
+        external_output_filename.parent.mkdir(parents=True, exist_ok=True)
+        output_filename.rename(external_output_filename)
+        print(f"Moved ZIP file to {external_output_filename}.")
 
 
 ###############################################################################################################
@@ -711,7 +730,6 @@ if not avoid_checksums:
 
     df.to_csv(output_filename, sep="\t", index=False)
 
-
 ###############################################################################################################
 if not avoid_checksums:
     pprint("Computing SHA256 checksum")
@@ -838,6 +856,6 @@ if not metadata[metadata["bildirectory"] == directory].empty:
     ].values[0]
 
 __to_json(df, directory)
-# __to_zip(df, dataset["bildid"], directory)
+__to_zip(df, dataset["bildid"], directory)
 __remove_checkpoint_file(checkpoint)
 __create_checkpoint_file(done)

@@ -1,5 +1,7 @@
 # Inventory Script(s)
 
+![Diagram]('images/diagram.png')
+
 ## Description
 
 This Python script generates an inventory of files in a specified directory, including file metadata such as extension, file type, creation date, size, checksums, and more. The script can be configured to update existing inventories, compress JSON files, and utilize multi-threading for faster processing.

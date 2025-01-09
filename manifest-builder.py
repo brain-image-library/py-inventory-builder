@@ -127,12 +127,17 @@ def __compute_xxh64sum(filename):
     hasher = xxhash.xxh64()  # Choose the appropriate hash function (xxh32, xxh64, etc.)
     BUFF_SIZE = 65536
 
-    # Open the file in binary mode
-    with open(filename, "rb") as file:
-        for chunk in iter(lambda: file.read(), b""):  # Read file in chunks
-            hasher.update(chunk)  # Update hash with each chunk
+    try:
+        # Open the file in binary mode
+        with open(filename, "rb") as file:
+            for chunk in iter(lambda: file.read(), b""):  # Read file in chunks
+                hasher.update(chunk)  # Update hash with each chunk
 
-    return hasher.hexdigest()  # Get the hexadecimal digest of the hash
+        return hasher.hexdigest()  # Get the hexadecimal digest of the hash
+    except Exception as e:
+        # Print the filename and raise the exception
+        print(f"Error processing file: {filename}")
+        raise e
 
 
 def __compute_sha256sum(filename):
@@ -343,7 +348,7 @@ def __to_json(df, directory):
 
     if update_json_file_on_bil_data:
         output_filename = (
-            f"/bil/data/inventory/{__generate_dataset_uuid(directory)}.json"
+            f"/bil/data/inventory/datasets/{__generate_dataset_uuid(directory)}.json"
         )
         with open(output_filename, "w") as ofile:
             json.dump(
@@ -369,6 +374,9 @@ def __to_zip(df, bildid, directory):
 
     temp_filename = f"{bildid}.zip"
 
+    if not Path("zip").exists():
+        Path("zip").mkdir()
+
     output_filename = f"zip/{bildid}.zip"
     # Save the DataFrame as a TSV file and compress it into a ZIP
     with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
@@ -377,13 +385,35 @@ def __to_zip(df, bildid, directory):
 
     print(f"Saving results to {output_filename}.")
 
-    output_filename = f"/bil/data/inventory/{bildid}.zip"
+    output_filename = f"/bil/data/inventory/datasets/{bildid}.zip"
     # Save the DataFrame as a TSV file and compress it into a ZIP
     with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
         with zipf.open(output_filename, "w") as tsv_file:
             df.to_csv(temp_filename, sep="\t", index=False)
 
     print(f"Saving results to {output_filename}.")
+
+
+def __to_zip(df, bildid, directory):
+    # Ensure "fullpath" column is of string type
+    df["fullpath"] = df["fullpath"].astype(str)
+
+    # Define temporary and output file paths
+    temp_tsv_filename = f"{bildid}.tsv"
+    local_zip_path = "zip"
+    local_zip_path.mkdir(
+        parents=True, exist_ok=True
+    )  # Create the directory if it doesn't exist
+    local_zip_filename = f"{local_zip_path}/{bildid}.zip"
+
+    # Save DataFrame to a TSV file
+    df.to_csv(temp_tsv_filename, sep="\t", index=False)
+
+    # Compress the TSV into a ZIP file in the local directory
+    with zipfile.ZipFile(local_zip_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
+        zipf.write(temp_tsv_filename, arcname=f"{bildid}.tsv")
+
+    print(f"Saved local zip to {local_zip_filename}")
 
 
 ###############################################################################################################
@@ -783,8 +813,8 @@ if not metadata[metadata["bildirectory"] == directory].empty:
         "contributor"
     ].values[0]
 
-    dataset["affiliation"] = metadata[metadata["bildirectory"] == directory][
-        "affiliation"
+    dataset["bildid"] = metadata[metadata["bildirectory"] == directory][
+        "bildid"
     ].values[0]
 
     dataset["award_number"] = metadata[metadata["bildirectory"] == directory][
@@ -808,5 +838,6 @@ if not metadata[metadata["bildirectory"] == directory].empty:
     ].values[0]
 
 __to_json(df, directory)
+# __to_zip(df, dataset["bildid"], directory)
 __remove_checkpoint_file(checkpoint)
 __create_checkpoint_file(done)

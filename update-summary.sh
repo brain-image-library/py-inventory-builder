@@ -13,7 +13,6 @@ if [ "$USER" = "icaoberg" ] && [ -f "/bil/users/icaoberg/miniconda3/etc/profile.
 
 	# Execute Python scripts
 	python ./update-summary.py
-	python ./create_list_file.py
 
 	# Modify JSON file ('today.json') using 'sed' commands
 	sed -i 's|"Allen Institute for Brain Science "|"Allen Institute for Brain Science"|g' today.json

@@ -165,19 +165,21 @@ def __compute_xxh64sum(filename):
     except Exception as e:
         # Print the filename and raise the exception
         print(f"Error processing file: {filename}")
-        raise e
-
 
 def __compute_b2sum(filename):
     hash_blake2b = hashlib.blake2b()
     buffer_size = 8192  # Read the file in chunks of 8KB
 
-    if Path(filename).is_file() or Path(filename).is_symlink():
-        with open(filename, "rb") as f:
-            while chunk := f.read(buffer_size):
-                hash_blake2b.update(chunk)
+    try:
+        if Path(filename).is_file() or Path(filename).is_symlink():
+            with open(filename, "rb") as f:
+                while chunk := f.read(buffer_size):
+                   hash_blake2b.update(chunk)
 
-    return hash_blake2b.hexdigest()
+        return hash_blake2b.hexdigest()
+    except:
+        print(f'Unable to process {filename}')
+        return None
 
 
 def __compute_sha256sum(filename):

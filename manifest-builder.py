@@ -364,13 +364,57 @@ def __get_file_creation_date(filename):
     t = os.path.getmtime(str(filename))
     return str(datetime.datetime.fromtimestamp(t))
 
-
+####################################################################################
 def __to_json(df, directory):
     df["fullpath"] = df["fullpath"].astype(str)
     files = df.to_dict("records")
     dataset["manifest"] = files
 
     output_filename = "json/" + __generate_dataset_uuid(directory) + ".json"
+    with open(output_filename, "w") as ofile:
+        json.dump(
+            dataset,
+            ofile,
+            indent=4,
+            sort_keys=True,
+            ensure_ascii=False,
+            cls=NumpyEncoder,
+        )
+
+    if compress_json_file_on_bil_data:
+        if compress_json_file_on_bil_data:
+            with gzip.open(f"{output_filename}.gz", "wt") as f:
+                f.write(str(dataset))
+
+    print(f"Saving results to {output_filename}.")
+
+    if update_json_file_on_bil_data:
+        output_filename = (
+            f"/bil/data/inventory/datasets/{__generate_dataset_uuid(directory)}.json"
+        )
+        with open(output_filename, "w") as ofile:
+            json.dump(
+                dataset,
+                ofile,
+                indent=4,
+                sort_keys=True,
+                ensure_ascii=False,
+                cls=NumpyEncoder,
+            )
+
+    print(f"Updating file {output_filename}.")
+
+    if compress_json_file_on_bil_data:
+        with gzip.open(f"{output_filename}.gz", "wt") as f:
+            f.write(str(dataset))
+
+####################################################################################
+def __to_json(df, bildid):
+    df["fullpath"] = df["fullpath"].astype(str)
+    files = df.to_dict("records")
+    dataset["manifest"] = files
+
+    output_filename = f"json/{bildid}.json"
     with open(output_filename, "w") as ofile:
         json.dump(
             dataset,
@@ -420,7 +464,7 @@ def __to_metadata(data, bildid):
     with open(output_filename, "w") as temp_file:
         json.dump(data, temp_file, indent=4)
 
-    print(f"Saved metadata TSV file to {output_filename}.")
+    print(f"Saved metadata TSV file as JSON to {output_filename}.")
 
 #####################################################################################
 def __to_zip(df, bildid, directory):
@@ -453,8 +497,8 @@ def __to_zip(df, bildid, directory):
     print(f"Saved ZIP file to {output_filename}.")
 
     # Clean up the temporary TSV file
-    temp_filename.unlink()
-    print(f"Deleted temporary TSV file: {temp_filename}.")
+    #temp_filename.unlink()
+    #print(f"Deleted temporary TSV file: {temp_filename}.")
 
 
 ###############################################################################################################
@@ -928,7 +972,7 @@ if not metadata[metadata["bildirectory"] == directory].empty:
         "technique"
     ].values[0]
 
-__to_json(df, directory)
+__to_json(df, dataset["bildid"])
 __to_metadata(dataset, dataset["bildid"])
 __to_zip(df, dataset["bildid"], directory)
 __remove_checkpoint_file(checkpoint)

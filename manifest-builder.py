@@ -151,22 +151,32 @@ def __get_filename(filename):
     return Path(filename).stem + Path(filename).suffix
 
 
-def __compute_xxh64sum(filename):
+def __compute_xxh64sum(filename, file_extensions):
+    # Check if the file extension is in the list to skip
+    if any(filename.endswith(ext) for ext in file_extensions):
+        return None
+
     hasher = xxhash.xxh64()  # Choose the appropriate hash function (xxh32, xxh64, etc.)
     BUFF_SIZE = 65536
 
     try:
         # Open the file in binary mode
         with open(filename, "rb") as file:
-            for chunk in iter(lambda: file.read(), b""):  # Read file in chunks
+            for chunk in iter(lambda: file.read(BUFF_SIZE), b""):  # Read file in chunks
                 hasher.update(chunk)  # Update hash with each chunk
 
         return hasher.hexdigest()  # Get the hexadecimal digest of the hash
     except Exception as e:
         # Print the filename and raise the exception
-        print(f"Error processing file: {filename}")
+        print(f"Error processing file: {filename}: {e}")
+        return None
 
-def __compute_b2sum(filename):
+
+def __compute_b2sum(filename, file_extensions):
+    # Check if the file extension is in the list to skip
+    if any(filename.endswith(ext) for ext in file_extensions):
+        return None
+
     hash_blake2b = hashlib.blake2b()
     buffer_size = 8192  # Read the file in chunks of 8KB
 
@@ -174,19 +184,22 @@ def __compute_b2sum(filename):
         if Path(filename).is_file() or Path(filename).is_symlink():
             with open(filename, "rb") as f:
                 while chunk := f.read(buffer_size):
-                   hash_blake2b.update(chunk)
+                    hash_blake2b.update(chunk)
 
         return hash_blake2b.hexdigest()
-    except:
-        print(f'Unable to process {filename}')
+    except Exception as e:
+        print(f"Unable to process {filename}: {e}")
         return None
 
 
-def __compute_sha256sum(filename):
-    # BUF_SIZE is totally arbitrary, change for your app!
-    BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
+def __compute_sha256sum(filename, file_extensions):
+    # Check if the file extension is in the list to skip
+    if any(filename.endswith(ext) for ext in file_extensions):
+        return None
 
+    BUF_SIZE = 65536  # Read in 64KB chunks
     sha256 = hashlib.sha256()
+
     if Path(filename).is_file() or Path(filename).is_symlink():
         with open(filename, "rb") as f:
             while True:
@@ -198,8 +211,12 @@ def __compute_sha256sum(filename):
     return sha256.hexdigest()
 
 
-def __compute_sha256sum_threaded(filename):
+def __compute_sha256sum_threaded(filename, file_extensions):
     BUF_SIZE = 65536
+
+    # Check if the file extension is in the list to skip
+    if any(filename.endswith(ext) for ext in file_extensions):
+        return None
 
     sha256 = hashlib.sha256()
 
@@ -250,10 +267,12 @@ def __compute_md5sum_threaded(filename):
     return md5.hexdigest()
 
 
-def __compute_md5sum(filename):
-    # BUF_SIZE is totally arbitrary, change for your app!
-    BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
+def __compute_md5sum(filename, file_extensions):
+    # Check if the file extension is in the list to skip
+    if any(filename.endswith(ext) for ext in file_extensions):
+        return None
 
+    BUF_SIZE = 65536  # Read in 64KB chunks
     md5 = hashlib.md5()
 
     if Path(filename).is_file() or Path(filename).is_symlink():
@@ -364,6 +383,7 @@ def __get_file_creation_date(filename):
     t = os.path.getmtime(str(filename))
     return str(datetime.datetime.fromtimestamp(t))
 
+
 ####################################################################################
 def __to_json(df, directory):
     df["fullpath"] = df["fullpath"].astype(str)
@@ -407,6 +427,7 @@ def __to_json(df, directory):
     if compress_json_file_on_bil_data:
         with gzip.open(f"{output_filename}.gz", "wt") as f:
             f.write(str(dataset))
+
 
 ####################################################################################
 def __to_json(df, bildid):
@@ -452,6 +473,7 @@ def __to_json(df, bildid):
         with gzip.open(f"{output_filename}.gz", "wt") as f:
             f.write(str(dataset))
 
+
 #####################################################################################
 def __to_metadata(data, bildid):
     # Create the "zip" directory if it does not exist
@@ -465,6 +487,7 @@ def __to_metadata(data, bildid):
         json.dump(data, temp_file, indent=4)
 
     print(f"Saved metadata TSV file as JSON to {output_filename}.")
+
 
 #####################################################################################
 def __to_zip(df, bildid, directory):
@@ -497,8 +520,8 @@ def __to_zip(df, bildid, directory):
     print(f"Saved ZIP file to {output_filename}.")
 
     # Clean up the temporary TSV file
-    #temp_filename.unlink()
-    #print(f"Deleted temporary TSV file: {temp_filename}.")
+    # temp_filename.unlink()
+    # print(f"Deleted temporary TSV file: {temp_filename}.")
 
 
 ###############################################################################################################
@@ -557,6 +580,9 @@ if not Path("json").exists():
 
 file = directory.replace("/", "_")
 output_filename = f".data/{file}.tsv"
+
+file_extensions = ["ims"]
+print(f"Ignoring files with extensions {file_extensions}")
 
 checkpoint = output_filename.replace(".tsv", ".computing")
 if not __create_checkpoint_file(checkpoint):
@@ -693,7 +719,7 @@ if not avoid_checksums:
                     __compute_md5sum_threaded
                 )
             else:
-                files["md5"] = files["fullpath"].parallel_apply(__compute_md5sum)
+                files["md5"] = files["fullpath"].parallel_apply(lambda x: __compute_md5sum(x, file_extensions))
 
             df = __update_dataframe(df, files, "md5")
             df.to_csv(output_filename, sep="\t", index=False)
@@ -712,7 +738,7 @@ if not avoid_checksums:
                         __compute_md5sum_threaded
                     )
                 else:
-                    files["md5"] = files["fullpath"].parallel_apply(__compute_md5sum)
+                    files["md5"] = files["fullpath"].parallel_apply(lambda x: __compute_md5sum(x, file_extensions))
 
                 df = __update_dataframe(df, files, "md5")
                 df.to_csv(output_filename, sep="\t", index=False)
@@ -728,9 +754,7 @@ if not avoid_checksums:
                             __compute_md5sum_threaded
                         )
                     else:
-                        chunk["md5"] = chunk["fullpath"].parallel_apply(
-                            __compute_md5sum
-                        )
+                        chunk["md5"] = chunk["fullpath"].parallel_apply(lambda x: __compute_md5sum(x, file_extensions))
 
                     df = __update_dataframe(df, chunk, "md5")
                     chunk_counter = chunk_counter + 1

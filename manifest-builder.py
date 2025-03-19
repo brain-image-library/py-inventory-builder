@@ -60,6 +60,7 @@ from pandarallel import pandarallel
 from tqdm import tqdm
 
 
+####################################################################################
 def pprint(msg):
     """
     Pretty-print the given message with horizontal lines above and below.
@@ -83,6 +84,7 @@ def pprint(msg):
     print(result)
 
 
+####################################################################################
 def __create_checkpoint_file(filename):
     """
     Creates a checkpoint file if it doesn't exist.
@@ -116,6 +118,7 @@ def __create_checkpoint_file(filename):
         return False
 
 
+####################################################################################
 def __remove_checkpoint_file(filename):
     # Create a Path object for the specified filename
     print(f"Checking the existence of checkpoint file {filename}")
@@ -132,25 +135,30 @@ def __remove_checkpoint_file(filename):
         return False
 
 
+####################################################################################
 def __get_file_size(filename):
     return Path(filename).stat().st_size
 
 
+####################################################################################
 def __get_relative_path(full_path):
     answer = str(full_path).replace(f"{directory}/", "")
     return answer
 
 
+####################################################################################
 def __update_dataframe(dataset, temp, key):
     for index, datum in temp.iterrows():
         dataset.loc[index, key] = temp.loc[index, key]
     return dataset
 
 
+####################################################################################
 def __get_filename(filename):
     return Path(filename).stem + Path(filename).suffix
 
 
+####################################################################################
 def __compute_xxh64sum(filename, file_extensions):
     # Check if the file extension is in the list to skip
     if any(filename.endswith(ext) for ext in file_extensions):
@@ -172,6 +180,7 @@ def __compute_xxh64sum(filename, file_extensions):
         return None
 
 
+####################################################################################
 def __compute_b2sum(filename, file_extensions):
     # Check if the file extension is in the list to skip
     if any(filename.endswith(ext) for ext in file_extensions):
@@ -192,6 +201,7 @@ def __compute_b2sum(filename, file_extensions):
         return None
 
 
+####################################################################################
 def __compute_sha256sum(filename, file_extensions):
     # Check if the file extension is in the list to skip
     if any(filename.endswith(ext) for ext in file_extensions):
@@ -211,6 +221,7 @@ def __compute_sha256sum(filename, file_extensions):
     return sha256.hexdigest()
 
 
+####################################################################################
 def __compute_sha256sum_threaded(filename, file_extensions):
     BUF_SIZE = 65536
 
@@ -241,6 +252,7 @@ def __compute_sha256sum_threaded(filename, file_extensions):
     return sha256.hexdigest()
 
 
+####################################################################################
 def __compute_md5sum_threaded(filename):
     BUF_SIZE = 65536
 
@@ -267,6 +279,7 @@ def __compute_md5sum_threaded(filename):
     return md5.hexdigest()
 
 
+####################################################################################
 def __compute_md5sum(filename, file_extensions):
     # Check if the file extension is in the list to skip
     if any(filename.endswith(ext) for ext in file_extensions):
@@ -286,12 +299,14 @@ def __compute_md5sum(filename, file_extensions):
     return md5.hexdigest()
 
 
+####################################################################################
 def __clean_directory(directory):
     if directory[-1] == "/":
         directory = directory[:-1]
     return directory
 
 
+####################################################################################
 def __get_chunk_size(dataframe):
     if len(dataframe) < 1000:
         return 10
@@ -305,6 +320,7 @@ def __get_chunk_size(dataframe):
         return 500
 
 
+####################################################################################
 def __generate_dataset_uuid(directory):
     if directory[-1] == "/":
         directory = directory[:-1]
@@ -312,6 +328,7 @@ def __generate_dataset_uuid(directory):
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, directory))
 
 
+####################################################################################
 def __get_directory_creation_date(directory):
     ti_c = os.path.getctime(directory)
     c_ti = time.ctime(ti_c)
@@ -319,6 +336,7 @@ def __get_directory_creation_date(directory):
     return c_ti
 
 
+####################################################################################
 def __get_files(directory):
     files = subprocess.check_output(["lfs", "find", "-type", "f", directory])
     files = str(files)
@@ -328,6 +346,7 @@ def __get_files(directory):
     return files
 
 
+####################################################################################
 def __get_file_extension(filename):
     if Path(filename).is_file() or Path(filename).is_symlink():
         extension = Path(filename).suffix
@@ -338,10 +357,12 @@ def __get_file_extension(filename):
     return extension
 
 
+####################################################################################
 def __get_number_of_files(directory):
     return len(__get_files(directory))
 
 
+####################################################################################
 def __get_mime_type(filename):
     answer = mimetypes.guess_type(filename)
     try:
@@ -350,6 +371,7 @@ def __get_mime_type(filename):
         return None
 
 
+####################################################################################
 def __get_filetype(extension):
     images = {
         ".tiff",
@@ -374,11 +396,13 @@ def __get_filetype(extension):
     return "other"
 
 
+####################################################################################
 def __get_url(filename):
     filename = str(filename)
     return filename.replace("/bil/data/", "https://download.brainimagelibrary.org/")
 
 
+####################################################################################
 def __get_file_creation_date(filename):
     t = os.path.getmtime(str(filename))
     return str(datetime.datetime.fromtimestamp(t))
@@ -719,7 +743,9 @@ if not avoid_checksums:
                     __compute_md5sum_threaded
                 )
             else:
-                files["md5"] = files["fullpath"].parallel_apply(lambda x: __compute_md5sum(x, file_extensions))
+                files["md5"] = files["fullpath"].parallel_apply(
+                    lambda x: __compute_md5sum(x, file_extensions)
+                )
 
             df = __update_dataframe(df, files, "md5")
             df.to_csv(output_filename, sep="\t", index=False)
@@ -738,7 +764,9 @@ if not avoid_checksums:
                         __compute_md5sum_threaded
                     )
                 else:
-                    files["md5"] = files["fullpath"].parallel_apply(lambda x: __compute_md5sum(x, file_extensions))
+                    files["md5"] = files["fullpath"].parallel_apply(
+                        lambda x: __compute_md5sum(x, file_extensions)
+                    )
 
                 df = __update_dataframe(df, files, "md5")
                 df.to_csv(output_filename, sep="\t", index=False)
@@ -754,7 +782,9 @@ if not avoid_checksums:
                             __compute_md5sum_threaded
                         )
                     else:
-                        chunk["md5"] = chunk["fullpath"].parallel_apply(lambda x: __compute_md5sum(x, file_extensions))
+                        chunk["md5"] = chunk["fullpath"].parallel_apply(
+                            lambda x: __compute_md5sum(x, file_extensions)
+                        )
 
                     df = __update_dataframe(df, chunk, "md5")
                     chunk_counter = chunk_counter + 1
@@ -780,7 +810,9 @@ if not avoid_checksums:
         print(f"Number of files to process is {str(len(files))}.")
 
         if len(files) > 0:
-            files["xxh64"] = files["fullpath"].parallel_apply(__compute_xxh64sum)
+            files["xxh64"] = files["fullpath"].parallel_apply(
+                lambda x: __compute_xxh64sum(x, file_extensions)
+            )
 
             df = __update_dataframe(df, files, "xxh64")
             df.to_csv(output_filename, sep="\t", index=False)
@@ -794,7 +826,9 @@ if not avoid_checksums:
             n = __get_chunk_size(files)
             print(f"Number of files to process is {str(len(files))}.")
             if n < 25:
-                files["xxh64"] = files["fullpath"].parallel_apply(__compute_xxh64sum)
+                files["xxh64"] = files["fullpath"].parallel_apply(
+                    lambda x: __compute_xxh64sum(x, file_extensions)
+                )
 
                 df = __update_dataframe(df, files, "xxh64")
                 df.to_csv(output_filename, sep="\t", index=False)
@@ -806,7 +840,7 @@ if not avoid_checksums:
                         f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}"
                     )
                     chunk["xxh64"] = chunk["fullpath"].parallel_apply(
-                        __compute_xxh64sum
+                        lambda x: __compute_xxh64sum(x, file_extensions)
                     )
 
                     df = __update_dataframe(df, chunk, "xxh64")
@@ -833,7 +867,9 @@ if not avoid_checksums:
         print(f"Number of files to process is {str(len(files))}.")
 
         if len(files) > 0:
-            files["b2sum"] = files["fullpath"].parallel_apply(__compute_b2sum)
+            files["b2sum"] = files["fullpath"].parallel_apply(
+                lambda x: __compute_b2sum(x, file_extensions)
+            )
 
             df = __update_dataframe(df, files, "b2sum")
             df.to_csv(output_filename, sep="\t", index=False)
@@ -847,7 +883,9 @@ if not avoid_checksums:
             n = __get_chunk_size(files)
             print(f"Number of files to process is {str(len(files))}.")
             if n < 25:
-                files["b2sum"] = files["fullpath"].parallel_apply(__compute_b2sum)
+                files["b2sum"] = files["fullpath"].parallel_apply(
+                    lambda x: __compute_b2sum(x, file_extensions)
+                )
 
                 df = __update_dataframe(df, files, "b2sum")
                 df.to_csv(output_filename, sep="\t", index=False)
@@ -858,7 +896,9 @@ if not avoid_checksums:
                     print(
                         f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}"
                     )
-                    chunk["b2sum"] = chunk["fullpath"].parallel_apply(__compute_b2sum)
+                    chunk["b2sum"] = chunk["fullpath"].parallel_apply(
+                        lambda x: __compute_b2sum(x, file_extensions)
+                    )
 
                     df = __update_dataframe(df, chunk, "b2sum")
                     chunk_counter = chunk_counter + 1
@@ -888,7 +928,9 @@ if not avoid_checksums:
                     __compute_sha256sum_threaded
                 )
             else:
-                files["sha256"] = files["fullpath"].parallel_apply(__compute_sha256sum)
+                files["sha256"] = files["fullpath"].parallel_apply(
+                    lambda x: __compute_sha256sum(x, file_extensions)
+                )
 
             df = __update_dataframe(df, files, "sha256")
             df.to_csv(output_filename, sep="\t", index=False)
@@ -909,7 +951,7 @@ if not avoid_checksums:
                     )
                 else:
                     files["sha256"] = files["fullpath"].parallel_apply(
-                        __compute_sha256sum
+                        lambda x: __compute_sha256sum(x, file_extensions)
                     )
 
                 df = __update_dataframe(df, files, "sha256")
@@ -928,7 +970,7 @@ if not avoid_checksums:
                         )
                     else:
                         chunk["sha256"] = chunk["fullpath"].parallel_apply(
-                            __compute_sha256sum
+                            lambda x: __compute_sha256sum(x, file_extensions)
                         )
 
                     df = __update_dataframe(df, chunk, "sha256")

@@ -561,6 +561,36 @@ parser.add_argument(
 parser.add_argument(
     "--compress", action=argparse.BooleanOptionalAction, dest="compress", default=False
 )
+
+parser.add_argument(
+    "--ignore-md5sum",
+    action=argparse.BooleanOptionalAction,
+    dest="ignore_md5",
+    default=False,
+)
+
+parser.add_argument(
+    "--ignore-sha256sum",
+    action=argparse.BooleanOptionalAction,
+    dest="ignore_sha256",
+    default=False,
+)
+
+parser.add_argument(
+    "--ignore-xxh64sum",
+    action=argparse.BooleanOptionalAction,
+    dest="ignore_xxh64",
+    default=False,
+)
+
+parser.add_argument(
+    "--ignore-b2sum",
+    action=argparse.BooleanOptionalAction,
+    dest="ignore_b2sum",
+    default=False,
+)
+
+
 parser.add_argument(
     "--remove-checkpoints",
     action=argparse.BooleanOptionalAction,
@@ -591,6 +621,10 @@ remove_checkpoints = bool(args.remove_checkpoints)
 multi_threading = bool(args.multi_threading)
 rebuild = bool(args.rebuild)
 ncores = int(args.ncores)
+ignore_md5sum = bool(args.ignore_md5)
+ignore_sha256sum = bool(args.ignore_sha256)
+ignore_xxh64sum = bool(args.ignore_xxh64)
+ignore_b2sum = bool(args.ignore_b2sum)
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 
 if directory[-1] == "/":
@@ -727,7 +761,7 @@ else:
 
 ###############################################################################################################
 warnings.filterwarnings("ignore")
-if not avoid_checksums:
+if not avoid_checksums or ignore_md5sum:
     pprint("Computing MD5 checksum")
 
     if len(df) < 100:
@@ -799,7 +833,7 @@ if not avoid_checksums:
 
 ###############################################################################################################
 warnings.filterwarnings("ignore")
-if not avoid_checksums:
+if not avoid_checksums or ignore_xxh64sum:
     pprint("Computing xxh64 checksum")
 
     if len(df) < 100:
@@ -856,7 +890,7 @@ if not avoid_checksums:
 
 ###############################################################################################################
 warnings.filterwarnings("ignore")
-if not avoid_checksums:
+if not avoid_checksums or ignore_b2sum:
     pprint("Computing b2sum checksum")
 
     if len(df) < 100:
@@ -912,7 +946,7 @@ if not avoid_checksums:
     df.to_csv(output_filename, sep="\t", index=False)
 
 ###############################################################################################################
-if not avoid_checksums:
+if not avoid_checksums or ignore_sha256sum:
     pprint("Computing SHA256 checksum")
 
     if len(df) < 100:

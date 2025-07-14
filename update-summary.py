@@ -406,7 +406,6 @@ def __compute_score(datum):
 ###############################################################################################################
 # Check if backup already
 ###############################################################################################################
-
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "-n", "--number-of-cores", dest="ncores", help="Number of cores", default=12
@@ -426,11 +425,6 @@ if Path("/bil/data/inventory").exists():
     report_output_filename = (
         f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.tsv'
     )
-    if Path(report_output_filename).exists():
-        print(
-            f"Backup file {report_output_filename} already exists. Skipping computation."
-        )
-        sys.exit()
 
 __pprint(f"Processing summary metadata from brainimagelibrary.org")
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
@@ -449,8 +443,6 @@ if "title" in df.keys():
 if "abstract" in df.keys():
     df = df.drop("abstract", axis=1)
 
-print("\nPopulating dataframe with dataset UUIDs")
-df["dataset_uuid"] = df["bildirectory"].parallel_apply(generate_dataset_uuid)
 print("\nChecking if BIL directory exists")
 df["exists"] = df["bildirectory"].parallel_apply(exists)
 print("\nComputing json file filename")
@@ -466,35 +458,42 @@ for index, row in tqdm(df.iterrows()):
     df.loc[index, "size"] = __get_dataset_size(data)
     df.loc[index, "pretty_size"] = __get_pretty_dataset_size(data)
 
-print("\nGetting number of files")
-df["number_of_files"] = df["bildirectory"].parallel_apply(__get_number_of_files)
+# print("\nGetting number of files")
+# df["number_of_files"] = df["bildirectory"].parallel_apply(__get_number_of_files)
+df["number_of_files"] = None
 
-print("\nGetting file types")
-df["file_types"] = df["json_file"].parallel_apply(__get_file_types)
+# print("\nGetting file types")
+# df["file_types"] = df["json_file"].parallel_apply(__get_file_types)
+df["file_types"] = None
 
-print("\nGetting file frequencies")
-df["frequencies"] = df["json_file"].parallel_apply(__get_frequencies)
+# print("\nGetting file frequencies")
+# df["frequencies"] = df["json_file"].parallel_apply(__get_frequencies)
+df["frequencies"] = None
 
-print("\nGetting file mime-types")
-df["mime_types"] = df["json_file"].parallel_apply(__get_mime_types)
+# print("\nGetting file mime-types")
+# df["mime_types"] = df["json_file"].parallel_apply(__get_mime_types)
+df["mime_types"] = None
 
 print("\nComputing temp file filename")
 df["temp_file"] = df["bildirectory"].parallel_apply(__get_temp_file)
 
-print("\nComputing MD5 coverage")
-df["md5_coverage"] = df["bildirectory"].parallel_apply(__get_md5_coverage)
+# print("\nComputing MD5 coverage")
+# df["md5_coverage"] = df["bildirectory"].parallel_apply(__get_md5_coverage)
+df["md5_coverage"] = None
 
-print("\nComputing SHA256 coverage")
-df["sha256_coverage"] = df["bildirectory"].parallel_apply(__get_sha256_coverage)
+# print("\nComputing SHA256 coverage")
+# df["sha256_coverage"] = df["bildirectory"].parallel_apply(__get_sha256_coverage)
+df["sha256_coverage"] = None
 
-print("\nComputing xxh64 coverage")
-df["xxh64_coverage"] = df["bildirectory"].parallel_apply(__get_xxh64_coverage)
+# print("\nComputing xxh64 coverage")
+# df["xxh64_coverage"] = df["bildirectory"].parallel_apply(__get_xxh64_coverage)
+df["xxh64_coverage"] = None
 
-print("\nComputing dataset score")
-for index, datum in df.iterrows():
-    df.loc[index, "score"] = __compute_score(datum)
-
-df = df.sort_values("score")
+# print("\nComputing dataset score")
+# for index, datum in df.iterrows():
+#    df.loc[index, "score"] = __compute_score(datum)
+# df = df.sort_values("score")
+df["score"] = None
 
 print("Saving dataframe to disk")
 df.to_csv("summary_metadata.tsv", sep="\t", index=False)
@@ -540,4 +539,5 @@ if not sample and Path("/bil/data/inventory").exists():
 print("Exporting dataframe to Excel spreadsheet")
 now = datetime.now()
 df.to_excel(
-    "summary_metadata.xlsx", sheet_name=str(now.strftime("%Y%m%d")), index=False)
+    "summary_metadata.xlsx", sheet_name=str(now.strftime("%Y%m%d")), index=False
+)

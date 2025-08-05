@@ -50,7 +50,7 @@ for index, datum in df.iterrows():
         if Path(old_filename).exists() and Path(old_filename).is_file():
             Path(old_filename).rename(new_filename)
         print(f'mv -v {old_filename} {new_filename}')
-       
+
         old_filename = old_filename.replace('.json.gz','.json')
         if Path(old_filename).exists() and Path(old_filename).is_file():
             Path(old_filename).unlink()

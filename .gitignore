@@ -1,3 +1,7 @@
+*.txt
+scripts/
+temp*
+*.zip
 *backup
 spatial_transcriptomics/
 *.png
@@ -9,3 +13,4 @@ spatial_transcriptomics/
 *.error
 slurm*out
 data*zip
+data*tgz

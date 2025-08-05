@@ -1,3 +1,5 @@
+import datetime
+from collections import OrderedDict
 import json
 import subprocess
 import pandas as pd
@@ -7,9 +9,40 @@ from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 from math import isnan
 import zipfile
+from pprint import pprint
+import requests
 
 # Connect to MongoDB
 client = MongoClient("mongodb://vm013.bil.psc.edu:27017/")
+
+def convert_time(ctime_string):
+    try:
+        # Parse the ctime string using strptime
+        dt_object = datetime.datetime.strptime(ctime_string, "%a %b %d %H:%M:%S %Y")
+
+        # Format the datetime object to YYYYMMDD
+        return dt_object.strftime("%Y%m%d")
+
+    except ValueError:
+        return None  # Return None if the input string is not in the expected format
+
+
+def get_today():
+    """Returns today's date in YYYYMMDD format."""
+    today = datetime.date.today()
+    return today.strftime("%Y%m%d")
+
+def is_url_accessible(url):
+    response = requests.head(url, timeout=5)  # Use HEAD request for efficiency
+    print(response.status_code)
+    return response.status_code == 200 #OK status code.
+
+
+def rename_key(dictionary, old_key, new_key):
+    """Renames a key in a dictionary."""
+    if old_key in dictionary:
+        dictionary[new_key] = dictionary.pop(old_key)  # Add new, remove old
+    return dictionary
 
 # Send a ping to confirm a successful connection
 try:
@@ -65,8 +98,25 @@ for file in files:
 
     if existing_document is None:  # If no document with the same bildid exists, insert
         print(f"Document with bildid {bildid} does not exist. Populating database.")
-        result = collection.insert_one(data)  # Insert a single document
-        print(f"Document inserted with MongoDB ID {result.inserted_id}")
+        data['size'] = {'bytes': data['size'], 'pretty': data['pretty_size']}
+        del data['pretty_size']
+
+        data['URL'] = {'hyperlink':data['download_url'], 'is_accessible': is_url_accessible(data['download_url']), 'last_check':get_today()}
+        del data['download_url']
+        data = rename_key(data,'download_url','URL')
+        data['creation_date'] = convert_time(data['creation_date'])
+        del data['dataset_uuid']
+
+        #result = collection.insert_one(data)  # Insert a single document
+        #print(f"Document inserted with MongoDB ID {result.inserted_id}")
+
     else:
         print(f"Document with bildid {bildid} already exists, skipping insertion.")
+
+    pprint(data)
+    break
 print("Data inserted/updated successfully.")
+
+# Close the connection
+client.close()
+print("MongoDB connection closed.")

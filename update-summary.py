@@ -462,20 +462,15 @@ for index, row in tqdm(df.iterrows()):
 # df["number_of_files"] = df["bildirectory"].parallel_apply(__get_number_of_files)
 df["number_of_files"] = None
 
-# print("\nGetting file types")
-# df["file_types"] = df["json_file"].parallel_apply(__get_file_types)
+# df["file_types"] = str(df["json_file"].parallel_apply(__get_file_types))
+# df["frequencies"] = str(df["json_file"].parallel_apply(__get_frequencies))
+# df["mimetypes"] = str(df["json_file"].parallel_apply(__get_mime_types))
+
+df["temp_file"] = str(df["bildirectory"].parallel_apply(__get_temp_file))
+
 df["file_types"] = None
-
-# print("\nGetting file frequencies")
-# df["frequencies"] = df["json_file"].parallel_apply(__get_frequencies)
 df["frequencies"] = None
-
-# print("\nGetting file mime-types")
-# df["mime_types"] = df["json_file"].parallel_apply(__get_mime_types)
 df["mime_types"] = None
-
-print("\nComputing temp file filename")
-df["temp_file"] = df["bildirectory"].parallel_apply(__get_temp_file)
 
 # print("\nComputing MD5 coverage")
 # df["md5_coverage"] = df["bildirectory"].parallel_apply(__get_md5_coverage)

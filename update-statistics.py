@@ -1,8 +1,12 @@
 from pandarallel import pandarallel
-pandarallel.initialize(progress_bar=True)  # Set to False if you don’t want tqdm-style progress
+
+pandarallel.initialize(
+    progress_bar=True
+)  # Set to False if you don’t want tqdm-style progress
 import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
+
 
 def get_temp_file(directory):
     """
@@ -24,11 +28,13 @@ def get_temp_file(directory):
     else:
         return None
 
+
 # Try importing humanize; install if not available
 try:
     import humanize
 except ImportError:
     import subprocess
+
     subprocess.check_call(["pip", "install", "humanize"])
     import humanize
 
@@ -61,15 +67,19 @@ for col in ["number_of_files", "size", "md5_coverage"]:
         df[col] = pd.NA
 
 # Ensure correct dtypes
-df["number_of_files"] = pd.to_numeric(df["number_of_files"], errors="coerce").astype("Int64")
+df["number_of_files"] = pd.to_numeric(df["number_of_files"], errors="coerce").astype(
+    "Int64"
+)
 df["size"] = pd.to_numeric(df["size"], errors="coerce").astype("Int64")
-df["md5_coverage"] = pd.to_numeric(df["md5_coverage"], errors="coerce").astype("Float64")
+df["md5_coverage"] = pd.to_numeric(df["md5_coverage"], errors="coerce").astype(
+    "Float64"
+)
 
-if not 'xxh64_coverage' in df.keys():
-   df['xxh64_coverage']=None
+if not "xxh64_coverage" in df.keys():
+    df["xxh64_coverage"] = None
 
-if not 'b2sum_coverage' in df.keys():
-   df['b2sum_coverage']=None
+if not "b2sum_coverage" in df.keys():
+    df["b2sum_coverage"] = None
 
 # -------------------------------
 # Define constants
@@ -81,10 +91,7 @@ output_path = Path("summary_metadata.tsv")
 # Process each row
 # -------------------------------
 for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing metadata"):
-    already_done = (
-        not pd.isna(row["number_of_files"]) and
-        not pd.isna(row["size"])
-    )
+    already_done = not pd.isna(row["number_of_files"]) and not pd.isna(row["size"])
     if already_done:
         continue
 
@@ -105,7 +112,7 @@ for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing metadata"):
                 total_size = temp_df["size"].sum(min_count=1)
                 df.at[idx, "size"] = int(total_size) if pd.notna(total_size) else pd.NA
 
-            #md5
+            # md5
             if pd.isna(row["md5_coverage"]):
                 if "md5" in temp_df.columns:
                     total = len(temp_df)
@@ -113,10 +120,12 @@ for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing metadata"):
                     coverage = (non_empty / total) * 100 if total > 0 else pd.NA
                     df.at[idx, "md5_coverage"] = round(coverage, 2)
                 else:
-                    print(f"'md5' column missing in {temp_path}, skipping md5_coverage calculation.")
+                    print(
+                        f"'md5' column missing in {temp_path}, skipping md5_coverage calculation."
+                    )
                     df.at[idx, "md5_coverage"] = None
 
-            #sha256
+            # sha256
             if pd.isna(row["sha256_coverage"]):
                 if "md5" in temp_df.columns:
                     total = len(temp_df)
@@ -124,10 +133,12 @@ for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing metadata"):
                     coverage = (non_empty / total) * 100 if total > 0 else pd.NA
                     df.at[idx, "sha256_coverage"] = round(coverage, 2)
                 else:
-                    print(f"'sha256' column missing in {temp_path}, skipping sha256_coverage calculation.")
+                    print(
+                        f"'sha256' column missing in {temp_path}, skipping sha256_coverage calculation."
+                    )
                     df.at[idx, "sha256_coverage"] = None
 
-            #xxh64
+            # xxh64
             if pd.isna(row["xxh64_coverage"]):
                 if "xxh64" in temp_df.columns:
                     total = len(temp_df)
@@ -135,10 +146,12 @@ for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing metadata"):
                     coverage = (non_empty / total) * 100 if total > 0 else pd.NA
                     df.at[idx, "xxh64_coverage"] = round(coverage, 2)
                 else:
-                    print(f"'xxh64' column missing in {temp_path}, skipping xxh64_coverage calculation.")
+                    print(
+                        f"'xxh64' column missing in {temp_path}, skipping xxh64_coverage calculation."
+                    )
                     df.at[idx, "xxh64_coverage"] = None
 
-            #b2sum
+            # b2sum
             if pd.isna(row["b2sum_coverage"]):
                 if "b2sum" in temp_df.columns:
                     total = len(temp_df)
@@ -146,18 +159,40 @@ for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing metadata"):
                     coverage = (non_empty / total) * 100 if total > 0 else pd.NA
                     df.at[idx, "b2sum_coverage"] = round(coverage, 2)
                 else:
-                    print(f"'b2sum' column missing in {temp_path}, skipping b2sum_coverage calculation.")
+                    print(
+                        f"'b2sum' column missing in {temp_path}, skipping b2sum_coverage calculation."
+                    )
                     df.at[idx, "b2sum_coverage"] = None
 
+            # frequencies
+            print('Computing frequencies')
+            df.at[idx, "frequencies"] = (
+                temp_df["extension"]
+                .dropna()
+                .value_counts()
+                .sort_values(ascending=False)
+                .to_dict()
+            )
 
-            #extension
-            df.at[idx, "frequencies"] = temp_df.groupby('extension')['size'].sum().to_dict()
+            # filetype
+            print('Computing file types')
+            df.at[idx, "file_types"] = (
+                temp_df["filetype"]
+                .dropna()
+                .value_counts()
+                .sort_values(ascending=False)
+                .to_dict()
+            )
 
-            #filetype
-            df.at[idx, "file_types"] = temp_df.groupby('file_type')['size'].sum().to_dict()
-
-            #mime-types
-            df.at[idx, "mime-types"] = temp_df.groupby('mime-type')['size'].sum().to_dict()
+            # mime-types
+            print('Computing mime-types')
+            df.at[idx, "mime-types"] = (
+                temp_df["mime-type"]
+                .dropna()
+                .value_counts()
+                .sort_values(ascending=False)
+                .to_dict()
+            )
 
         except Exception as e:
             print(f"Error reading {temp_path}: {e}")
@@ -179,9 +214,11 @@ df["pretty_size"] = df["size"].apply(
 # Compute json_file paths if they exist
 # -------------------------------
 df["json_file"] = df["bildid"].apply(
-    lambda b: f"/bil/pscstaff/icaoberg/bil-inventory/json/{b}.json"
-    if Path(f"/bil/pscstaff/icaoberg/bil-inventory/json/{b}.json").exists()
-    else pd.NA
+    lambda b: (
+        f"/bil/pscstaff/icaoberg/bil-inventory/json/{b}.json"
+        if Path(f"/bil/pscstaff/icaoberg/bil-inventory/json/{b}.json").exists()
+        else pd.NA
+    )
 )
 
 # -------------------------------
@@ -189,4 +226,3 @@ df["json_file"] = df["bildid"].apply(
 # -------------------------------
 df.to_csv(output_path, sep="\t", index=False)
 print(f"Final data written to '{output_path}'")
-

@@ -15,6 +15,7 @@
 .ipynb_checkpoints/
 JSON
 columns/
+credentials.json
 data*tgz
 data*zip
 database/

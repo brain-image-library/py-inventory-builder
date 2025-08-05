@@ -1,3 +1,7 @@
+columns/
+database/
+duckdb/
+filetypes/
 *csv
 example*
 *.sif

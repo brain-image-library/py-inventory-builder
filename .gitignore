@@ -1,3 +1,5 @@
+research/
+test*
 *.txt
 scripts/
 temp*

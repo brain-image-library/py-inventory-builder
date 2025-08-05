@@ -1,5 +1,8 @@
+*.jpg
 *.json
 *.tsv
 .data/
 *.out
 *.error
+slurm*out
+data*zip

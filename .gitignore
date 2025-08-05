@@ -1,3 +1,6 @@
+*backup
+spatial_transcriptomics/
+*.png
 *.jpg
 *.json
 *.tsv

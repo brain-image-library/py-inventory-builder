@@ -14,10 +14,11 @@
 
 # Load the Conda environment manager
 . "/bil/users/icaoberg/miniconda3/etc/profile.d/conda.sh"
+conda activate spreadsheet
 
 # ──────────────────────────────────────────────────────────────
 # Run the checksum scoring script using 12 parallel workers
 # ──────────────────────────────────────────────────────────────
 
-python ./compute_all_scores -n 12
-
+python ./compute_all_scores.py -n 12
+python ./create_spreadsheet.py

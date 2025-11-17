@@ -478,9 +478,7 @@ def __to_json(df, bildid):
     print(f"Saving results to {output_filename}.")
 
     if update_json_file_on_bil_data:
-        output_filename = (
-            f"/bil/data/inventory/datasets/{__generate_dataset_uuid(directory)}.json"
-        )
+        output_filename = f"/bil/data/inventory/datasets/JSON/{__generate_dataset_uuid(directory)}.json"
         with open(output_filename, "w") as ofile:
             json.dump(
                 dataset,
@@ -639,6 +637,8 @@ if not Path("json").exists():
 file = directory.replace("/", "_")
 output_filename = f".data/{file}.tsv"
 
+pprint(f"Processing dataset in {directory}")
+
 file_extensions = ["ims"]
 print(f"Ignoring files with extensions {file_extensions}")
 
@@ -681,8 +681,6 @@ else:
     df["fullpath"] = files
 
 df.to_csv(output_filename, sep="\t", index=False)
-
-pprint(f"Processing dataset in {directory}")
 
 if df.empty:
     print(f"No files found in {directory}. Exiting program.")
@@ -756,6 +754,15 @@ if "download_url" not in df.keys():
     print("Computing download URL")
     df["download_url"] = df["fullpath"].parallel_apply(__get_url)
     df.to_csv(output_filename, sep="\t", index=False)
+else:
+    print("No files left to process.")
+
+###############################################################################################################
+pprint("Find cell_by_gene")
+if "is_cell_by_gene" not in df.keys():
+    df["is_cell_by_gene"] = df["filename"].str.startswith("cell_by_gene", na=False)
+    df.to_csv(output_filename, sep="\t", index=False)
+    print("Finished computing values.")
 else:
     print("No files left to process.")
 

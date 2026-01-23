@@ -161,8 +161,11 @@ def __get_filename(filename):
 ####################################################################################
 def __compute_xxh64sum(filename, file_extensions):
     # Check if the file extension is in the list to skip
-    if any(filename.endswith(ext) for ext in file_extensions):
-        return None
+    try:
+        if any(filename.endswith(ext) for ext in file_extensions):
+            return None
+    except Exception as e:
+        print(f"Eeror processing file: {filename}: {e}")
 
     hasher = xxhash.xxh64()  # Choose the appropriate hash function (xxh32, xxh64, etc.)
     BUFF_SIZE = 65536
@@ -642,35 +645,41 @@ pprint(f"Processing dataset in {directory}")
 file_extensions = ["ims"]
 print(f"Ignoring files with extensions {file_extensions}")
 
+# if done file exists, then do not process dataset
+done = output_filename.replace(".tsv", ".done")
+if Path(done).exists():
+    if remove_checkpoints:
+        print("Removing checkpoints.")
+        Path(done).unlink()
+    else:
+        print("The processing of this dataset is finished. Exiting.")
+        sys.exit()
+
+# if checkpoint file exists, then do not process dataset
 checkpoint = output_filename.replace(".tsv", ".computing")
 if not __create_checkpoint_file(checkpoint):
     print("Another process is building an inventory for this dataset. Exiting.")
     sys.exit()
 
-done = output_filename.replace(".tsv", ".done")
-
-if Path(done).exists() and remove_checkpoints:
-    print("Removing checkpoints")
-    Path(checkpoint).unlink()
-    Path(done).unlink()
-
-if Path(done).exists():
-    print("The processing of this dataset is finished. Exiting.")
-    Path(checkpoint).unlink()
-    sys.exit()
-
+# if this option is selected, then rebuild dataset
 if rebuild:
     if Path(output_filename).exists() or Path(output_filename).is_symlink():
         print("Rebuilding dataframe. Removing existing TSV file.")
         Path(output_filename).unlink()
 
+# if scratch exists, then use it. else use /local or /tmp
 temp_directory = "/scratch/icaoberg/"
 if not Path(temp_directory).exists():
-    temp_directory = "/tmp/"
+    if Path("/local/").exists():
+        temp_directory = "/local/"
+    else:
+        temp_directory = "/tmp/"
 
+# if there exists a temp file with pre-processed stats, then reuse it
 if Path(temp_directory + output_filename).exists():
     shutil.copyfile(temp_directory + output_filename, output_filename)
 
+# finding all the files in the directory
 if Path(output_filename).exists():
     print(f"Found temporary file {output_filename}. Loading local file.")
     df = pd.read_csv(output_filename, sep="\t", low_memory=False)
@@ -682,6 +691,7 @@ else:
 
 df.to_csv(output_filename, sep="\t", index=False)
 
+# if directory is empty, then do not process dataset
 if df.empty:
     print(f"No files found in {directory}. Exiting program.")
     sys.exit()

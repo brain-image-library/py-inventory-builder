@@ -1,0 +1,11 @@
+Bootstrap: docker
+From: mongo
+
+%environment
+    MONGO_USERNAME=testuser 
+    MONGO_PASSWORD=userpass
+    PORT=27017
+    export MONGO_USERNAME MONGO_PASSWORD PORT
+
+%startscript
+    docker-entrypoint.sh mongod

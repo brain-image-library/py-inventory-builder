@@ -10,7 +10,7 @@ from math import isnan
 import zipfile
 
 # Connect to MongoDB on BIL
-client = MongoClient("mongodb://vm013.bil.psc.edu:27017/")
+client = MongoClient("mongodb://localhost:27017/")
 
 # Send a ping to confirm a successful connection
 try:

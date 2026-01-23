@@ -30,3 +30,13 @@ slurm*out
 spatial_transcriptomics/
 temp*
 test*
+duckdatabase
+sqllite
+spectra-storcycle
+TSV
+benchmark_checksums
+cell_by_gene_check
+cuda
+*.xlsx
+.data
+data

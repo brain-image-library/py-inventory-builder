@@ -16,7 +16,6 @@ import requests
 import tabulate
 from pandarallel import pandarallel
 
-
 def __pprint(msg):
     """
     Pretty prints a message with a surrounding border of '+' and '-' characters.
@@ -261,7 +260,10 @@ def exists(directory):
     Returns:
         bool: True if the directory exists, False otherwise.
     """
-    return Path(directory).exists()
+    try:
+        return Path(directory).exists()
+    except:
+        return False
 
 
 def __get_temp_file(directory):

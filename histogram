@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# ─────────────────────────────────────────────
+# Check for required input file
+# ─────────────────────────────────────────────
+if [ ! -f data.json ]; then
+    echo "❌ Error: data.json not found in current directory. Exiting."
+    exit 1
+fi
+
+# ─────────────────────────────────────────────
+# Check for required binary
+# ─────────────────────────────────────────────
+if ! command -v lowcharts &> /dev/null; then
+    echo "❌ Error: 'lowcharts' binary not found in PATH. Exiting."
+    exit 1
+fi
+
+# ─────────────────────────────────────────────
+# Set your field name (defaults to 'size')
+# ─────────────────────────────────────────────
+FIELD=${FIELD:-size}
+BIN_SIZE=100000
+
+# ─────────────────────────────────────────────
+# Parse and bin values, then plot using lowcharts
+# ─────────────────────────────────────────────
+jq -r --arg field "$FIELD" '.[] | .[$field]' data.json \
+| awk -v bin_size="$BIN_SIZE" '
+{
+    bin = int($1 / bin_size) * bin_size;
+    bins[bin]++;
+}
+END {
+    for (b in bins)
+        printf "%d-%d %d\n", b, b+bin_size-1, bins[b];
+}' | sort -n | lowcharts

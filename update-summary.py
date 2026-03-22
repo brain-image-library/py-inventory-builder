@@ -1,9 +1,15 @@
+import pymongo
+import argparse
+import pdb
+import brainimagelibrary as brainzzz
 import subprocess
 import uuid
 from datetime import datetime
 from pathlib import Path
 import sys
 import json
+import traceback
+import sqlite3
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -11,41 +17,138 @@ import requests
 import tabulate
 from pandarallel import pandarallel
 
-
 def __pprint(msg):
+    """
+    Pretty prints a message with a surrounding border of '+' and '-' characters.
+
+    Args:
+        msg (str): The message to be printed.
+
+    Returns:
+        None
+    """
     row = len(msg)
-    h = "".join(["+"] + ["-" * row] + ["+"])
-    result = h + "\n" "|" + msg + "|" "\n" + h
-    print(result)
+    h = "".join(["+"] + ["-" * row] + ["+"])  # Create the border line
+    result = h + "\n" "|" + msg + "|" "\n" + h  # Construct the formatted message
+    print(result)  # Print the formatted message
 
 
 def __get_data(json_file):
-    try:
-        # Open the JSON file
-        with open(json_file, "r") as file:
-            # Load the JSON data into a dictionary
-            data = json.load(file)
+    """
+    Reads and loads JSON data from a specified file into a dictionary.
 
+    Args:
+        json_file (str): Path to the JSON file.
+
+    Returns:
+        dict: A dictionary containing the loaded JSON data, or an empty dictionary if the file cannot be read.
+    """
+    try:
+        with open(json_file, "r") as file:
+            data = json.load(file)
         return data
     except:
         return {}
 
 
-def __get_file_types(data):
+def __get_mime_types(filename):
+    """
+    Extracts MIME type frequencies from a JSON file containing 'manifest' data.
+
+    Parameters:
+    filename (str): Path to the JSON file containing 'manifest' data.
+
+    Returns:
+    dict: A dictionary where keys are MIME types and values are their respective frequencies.
+          The frequencies represent the number of occurrences of each MIME type in the file.
+    """
+
     try:
-        return data["file_types"]
+        # Load JSON data from file
+        with open(filename, "r") as f:
+            json_data = json.load(f)
+
+        # Extract the 'manifest' field into a DataFrame
+        data = json_data["manifest"]
+        df = pd.DataFrame(data)
+
+        # Count occurrences of each MIME type and convert to dictionary
+        mime_type_counts = df["mime-type"].value_counts().to_dict()
+
+        return mime_type_counts
+    except:
+        traceback.print_exc()
+        return {}
+
+
+def __get_file_types(filename):
+    """
+    Extracts file type frequencies from a JSON file containing 'manifest' data.
+
+    Parameters:
+    filename (str): Path to the JSON file containing 'manifest' data.
+
+    Returns:
+    dict: A dictionary where keys are file types and values are their respective frequencies.
+          The frequencies represent the number of occurrences of each file type in the file.
+    """
+
+    try:
+        # Load JSON data from file
+        with open(filename, "r") as f:
+            json_data = json.load(f)
+
+        # Extract the 'manifest' field into a DataFrame
+        data = json_data["manifest"]
+        df = pd.DataFrame(data)
+
+        # Count occurrences of each file type and convert to dictionary
+        file_type_counts = df["filetype"].value_counts().to_dict()
+
+        return file_type_counts
     except:
         return None
 
 
-def __get_frequencies(data):
+def __get_frequencies(filename):
+    """
+    Extracts frequencies of file extensions from a JSON file containing 'manifest' data.
+
+    Parameters:
+    filename (str): Path to the JSON file containing 'manifest' data.
+
+    Returns:
+    dict: A dictionary where keys are file extensions and values are their respective frequencies.
+          The frequencies represent the number of occurrences of each file extension in the file.
+    """
+
     try:
-        return data["frequencies"]
+        # Load JSON data from file
+        with open(filename, "r") as f:
+            json_data = json.load(f)
+
+        # Extract the 'manifest' field into a DataFrame
+        data = json_data["manifest"]
+        df = pd.DataFrame(data)
+
+        # Count occurrences of each file extension and convert to dictionary
+        extension_counts = df["extension"].value_counts().to_dict()
+
+        return extension_counts
     except:
-        return None
+        return {}
 
 
 def __get_dataset_size(data):
+    """
+    Retrieves the 'size' attribute from a JSON data dictionary.
+
+    Args:
+        data (dict): The JSON data dictionary.
+
+    Returns:
+        int or None: Size of the dataset, or None if 'size' attribute is missing or invalid.
+    """
     try:
         return data["size"]
     except:
@@ -53,6 +156,15 @@ def __get_dataset_size(data):
 
 
 def __get_pretty_dataset_size(data):
+    """
+    Retrieves the 'pretty_size' attribute from a JSON data dictionary.
+
+    Args:
+        data (dict): The JSON data dictionary.
+
+    Returns:
+        str or None: Pretty size of the dataset, or None if 'pretty_size' attribute is missing or invalid.
+    """
     try:
         return data["pretty_size"]
     except:
@@ -60,6 +172,15 @@ def __get_pretty_dataset_size(data):
 
 
 def __get_creation_date(data):
+    """
+    Retrieves the 'creation_date' attribute from a JSON data dictionary.
+
+    Args:
+        data (dict): The JSON data dictionary.
+
+    Returns:
+        str or None: Creation date of the dataset, or None if 'creation_date' attribute is missing or invalid.
+    """
     try:
         return data["creation_date"]
     except:
@@ -67,12 +188,32 @@ def __get_creation_date(data):
 
 
 def __update_dataframe(dataset, temp, key):
+    """
+    Update a DataFrame ('dataset') with values from another DataFrame ('temp') based on a specified 'key'.
+
+    Args:
+        dataset (pandas.DataFrame): The target DataFrame to be updated.
+        temp (pandas.DataFrame): The DataFrame containing updated values.
+        key (str): The column key used for updating.
+
+    Returns:
+        pandas.DataFrame: The updated DataFrame ('dataset').
+    """
     for index, datum in temp.iterrows():
         dataset.loc[index, key] = temp.loc[index, key]
     return dataset
 
 
 def __get_files(directory):
+    """
+    Retrieves a list of files within a directory using the 'lfs find' command.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        list: A list of file paths within the directory.
+    """
     files = subprocess.check_output(["lfs", "find", "-type", "f", directory])
     files = str(files)
     files = files.replace("b'/bil/data/", "/bil/data/")
@@ -82,10 +223,28 @@ def __get_files(directory):
 
 
 def __get_number_of_files(directory):
+    """
+    Retrieves the number of files within a directory.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        int: The number of files within the directory.
+    """
     return len(__get_files(directory))
 
 
 def generate_dataset_uuid(directory):
+    """
+    Generates a UUID for a given directory path.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        str: The generated UUID.
+    """
     if directory[-1] == "/":
         directory = directory[:-1]
 
@@ -93,10 +252,31 @@ def generate_dataset_uuid(directory):
 
 
 def exists(directory):
-    return Path(directory).exists()
+    """
+    Checks if a directory exists.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        bool: True if the directory exists, False otherwise.
+    """
+    try:
+        return Path(directory).exists()
+    except:
+        return False
 
 
 def __get_temp_file(directory):
+    """
+    Generates a temporary file path based on a directory path.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        str or None: The temporary file path, or None if the file does not exist.
+    """
     if directory[-1] == "/":
         directory = directory[:-1]
     file = directory.replace("/", "_")
@@ -109,8 +289,17 @@ def __get_temp_file(directory):
 
 
 def __get_json_file(directory):
+    """
+    Generates a JSON file path based on a directory path using a generated UUID.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        str or None: The JSON file path, or None if the file does not exist.
+    """
     dataset_uuid = generate_dataset_uuid(directory)
-    output_filename = f"/bil/data/inventory/{dataset_uuid}.json"
+    output_filename = f"/bil/data/inventory/datasets/JSON{dataset_uuid}.json"
 
     if Path(output_filename).exists():
         return output_filename
@@ -119,11 +308,20 @@ def __get_json_file(directory):
 
 
 def __get_md5_coverage(directory):
+    """
+    Calculates coverage based on the 'md5' hash from a DataFrame.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        float or None: Coverage percentage of 'md5' hash, or None if unable to process.
+    """
     try:
         output_filename = __get_temp_file(directory)
         if output_filename is not None and Path(output_filename).exists():
             df = pd.read_csv(output_filename, sep="\t", low_memory=False)
-            if "md5" in df.keys():
+            if "md5" in df.columns:
                 return (len(df) - df["md5"].isnull().sum()) / len(df)
             else:
                 return 0
@@ -135,11 +333,20 @@ def __get_md5_coverage(directory):
 
 
 def __get_sha256_coverage(directory):
+    """
+    Calculates coverage based on the 'sha256' hash from a DataFrame.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        float or None: Coverage percentage of 'sha256' hash, or None if unable to process.
+    """
     try:
         output_filename = __get_temp_file(directory)
         if output_filename is not None and Path(output_filename).exists():
             df = pd.read_csv(output_filename, sep="\t", low_memory=False)
-            if "sha256" in df.keys():
+            if "sha256" in df.columns:
                 return (len(df) - df["sha256"].isnull().sum()) / len(df)
             else:
                 return 0
@@ -150,76 +357,101 @@ def __get_sha256_coverage(directory):
         return None
 
 
+def __get_xxh64_coverage(directory):
+    """
+    Calculates coverage based on the 'xxh64' hash from a DataFrame.
+
+    Args:
+        directory (str): The directory path.
+
+    Returns:
+        float or None: Coverage percentage of 'xxh64' hash, or None if unable to process.
+    """
+    try:
+        output_filename = __get_temp_file(directory)
+        if output_filename is not None and Path(output_filename).exists():
+            df = pd.read_csv(output_filename, sep="\t", low_memory=False)
+            if "xxh64" in df.columns:
+                return (len(df) - df["xxh64"].isnull().sum()) / len(df)
+            else:
+                return 0
+        else:
+            return 0
+    except:
+        print(f"Unable to process file {output_filename}")
+        return None
+
+
 def __compute_score(datum):
+    """
+    Computes a score based on attributes in a 'datum' dictionary.
+
+    Args:
+        datum (dict): The data dictionary containing attributes.
+
+    Returns:
+        float: Computed score based on specified attributes.
+    """
     score = 0
+
     if "json_file" in datum.keys() and datum["json_file"] is not None:
-        score = score + 1
+        score += 1
 
     if "md5_coverage" in datum.keys():
-        score = (score + datum["md5_coverage"] + datum["sha256_coverage"]) / 3.0
+        coverage_sum = (
+            datum["md5_coverage"] + datum["sha256_coverage"] + datum["xxh64_coverage"]
+        )
+        score = coverage_sum / 3.0
 
     return score
 
 
 ###############################################################################################################
 # Check if backup already
+###############################################################################################################
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "-n", "--number-of-cores", dest="ncores", help="Number of cores", default=12
+)
+
+parser.add_argument(
+    "--sample", action=argparse.BooleanOptionalAction, dest="sample", default=False
+)
+
+args = parser.parse_args()
+sample = args.sample
+ncores = args.ncores
+
 if Path("/bil/data/inventory").exists():
     now = datetime.now()
     report_output_directory = "/bil/data/inventory/daily/reports"
     report_output_filename = (
         f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.tsv'
     )
-    if Path(report_output_filename).exists():
-        print(
-            f"Backup file {report_output_filename} already exists. Skipping computation."
-        )
-        sys.exit()
 
 __pprint(f"Processing summary metadata from brainimagelibrary.org")
-url = "https://submit.brainimagelibrary.org/search/summarymetadata"
-temp_file = Path(f"/tmp/summarymetadata.csv")
-
-if temp_file.exists():
-    temp_file.unlink()
-
-ncores = 25
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 
-response = requests.get(url)
-temp_file.write_bytes(response.content)
+report = brainzzz.reports.__create_daily_report()
+df = pd.DataFrame(report)
 
-df = pd.read_csv(temp_file, sep=",", low_memory=False)
-if df.keys()[0] == "<html>":
-    print(f"File is empty. More than likely the submit VM is down.")
-    print(f"Attempting to load backup file, if it exists.")
-    if Path("/bil/data/inventory").exists():
-        now = datetime.now()
-        report_output_directory = "/bil/data/inventory/daily"
-        report_output_filename = (
-            f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.csv'
-        )
-        if Path(report_output_filename).exists():
-            temp_file = report_output_filename
-            df = pd.read_csv(temp_file, sep=",", low_memory=False)
-        else:
-            print(f"Unable to find file {report_output_filename}. Exiting program.")
-            sys.exit()
+# sample some rows for testing
+if sample:
+    df = df.sample(frac=0.1, replace=True)
 
-##clean dataframe
+# clean dataframe
 if "title" in df.keys():
     df = df.drop("title", axis=1)
 
 if "abstract" in df.keys():
     df = df.drop("abstract", axis=1)
 
-print("\nPopulating dataframe with dataset UUIDs")
-df["dataset_uuid"] = df["bildirectory"].parallel_apply(generate_dataset_uuid)
 print("\nChecking if BIL directory exists")
 df["exists"] = df["bildirectory"].parallel_apply(exists)
 print("\nComputing json file filename")
 df["json_file"] = df["bildirectory"].parallel_apply(__get_json_file)
 
-df = df[df["exists"] == True]
+df = df[df["exists"] == True].copy()
 
 print("\nGet data from JSON file")
 for index, row in tqdm(df.iterrows()):
@@ -229,51 +461,81 @@ for index, row in tqdm(df.iterrows()):
     df.loc[index, "size"] = __get_dataset_size(data)
     df.loc[index, "pretty_size"] = __get_pretty_dataset_size(data)
 
-print("\nGetting number of files")
-df["number_of_files"] = df["bildirectory"].parallel_apply(__get_number_of_files)
+# print("\nGetting number of files")
+# df["number_of_files"] = df["bildirectory"].parallel_apply(__get_number_of_files)
+df["number_of_files"] = None
 
-# print("\nGetting file types")
-# df["file_types"] = df["json_file"].parallel_apply(__get_file_types)
+# df["file_types"] = str(df["json_file"].parallel_apply(__get_file_types))
+# df["frequencies"] = str(df["json_file"].parallel_apply(__get_frequencies))
+# df["mimetypes"] = str(df["json_file"].parallel_apply(__get_mime_types))
 
-# print("\nGetting frequencies")
-# df["frequencies"] = df["json_file"].parallel_apply(__get_frequencies)
-
-print("\nComputing temp file filename")
 df["temp_file"] = df["bildirectory"].parallel_apply(__get_temp_file)
 
-print("\nComputing MD5 coverage")
-df["md5_coverage"] = df["bildirectory"].parallel_apply(__get_md5_coverage)
+df["file_types"] = None
+df["frequencies"] = None
+df["mime_types"] = None
 
-print("\nComputing SHA256 coverage")
-df["sha256_coverage"] = df["bildirectory"].parallel_apply(__get_sha256_coverage)
+# print("\nComputing MD5 coverage")
+# df["md5_coverage"] = df["bildirectory"].parallel_apply(__get_md5_coverage)
+df["md5_coverage"] = None
 
-print("\nComputing dataset score")
-for index, datum in df.iterrows():
-    df.loc[index, "score"] = __compute_score(datum)
+# print("\nComputing SHA256 coverage")
+# df["sha256_coverage"] = df["bildirectory"].parallel_apply(__get_sha256_coverage)
+df["sha256_coverage"] = None
 
-df = df.sort_values("score")
+# print("\nComputing xxh64 coverage")
+# df["xxh64_coverage"] = df["bildirectory"].parallel_apply(__get_xxh64_coverage)
+df["xxh64_coverage"] = None
+
+# print("\nComputing dataset score")
+# for index, datum in df.iterrows():
+#    df.loc[index, "score"] = __compute_score(datum)
+# df = df.sort_values("score")
+df["score"] = None
 
 print("Saving dataframe to disk")
+if "bildid" in df.columns:
+    df = df.sort_values("bildid", na_position="last").reset_index(drop=True)
 df.to_csv("summary_metadata.tsv", sep="\t", index=False)
 
+db_path = Path("summary_metadata.sql")
+if not db_path.exists():
+    print("Saving dataframe to SQLite database")
+    with sqlite3.connect(db_path) as conn:
+        df.to_sql("summary_metadata", conn, if_exists="replace", index=False)
+
+print("Updating database.sql with new rows")
+db_path = Path("database.sql")
+with sqlite3.connect(db_path) as conn:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS summary_metadata (
+            bildirectory TEXT PRIMARY KEY
+        )
+    """)
+    existing = pd.read_sql("SELECT bildirectory FROM summary_metadata", conn)
+    existing_dirs = set(existing["bildirectory"].dropna())
+    new_rows = df[~df["bildirectory"].isin(existing_dirs)]
+    if not new_rows.empty:
+        # Add any columns not yet in the table
+        cursor = conn.execute("PRAGMA table_info(summary_metadata)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+        for col in new_rows.columns:
+            if col not in existing_cols:
+                conn.execute(f'ALTER TABLE summary_metadata ADD COLUMN "{col}" TEXT')
+        cols = ", ".join(f'"{c}"' for c in new_rows.columns)
+        placeholders = ", ".join("?" for _ in new_rows.columns)
+        conn.executemany(
+            f'INSERT OR IGNORE INTO summary_metadata ({cols}) VALUES ({placeholders})',
+            new_rows.itertuples(index=False, name=None)
+        )
+        conn.commit()
+        print(f"Inserted {len(new_rows)} new rows into database.sql")
+    else:
+        print("No new rows to insert into database.sql")
+
 # saves to public directory
-if Path("/bil/data/inventory").exists():
-    print("Backing up data to /bil/data/inventory")
-    now = datetime.now()
-    report_output_directory = "/bil/data/inventory/daily/reports"
-    report_output_filename = (
-        f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.tsv'
-    )
-    df.to_csv(report_output_filename, sep="\t", index=False)
-
-    symlink_file = f"{report_output_directory}/today.tsv"
-    if Path(symlink_file).exists():
-        Path(symlink_file).unlink()
-
-    command = f"ln -s {report_output_filename} {symlink_file}"
-    print(command)
-    output = subprocess.check_output(command, shell=True)
-
+if not sample and Path("/bil/data/inventory").exists():
+    print("Creating JSON")
     now = datetime.now()
     report_output_directory = "/bil/data/inventory/daily/reports"
     report_output_filename = (
@@ -285,9 +547,29 @@ if Path("/bil/data/inventory").exists():
     if Path(symlink_file).exists():
         Path(symlink_file).unlink()
 
-    command = f"ln -s {report_output_filename} {symlink_file}"
+    command = f"rm -fv {symlink_file} & ln -s {report_output_filename} {symlink_file}"
     print(command)
     output = subprocess.check_output(command, shell=True)
+
+    print("Backing up data to /bil/data/inventory")
+    print("Creating TSV file")
+    df.drop(columns=["file_types", "frequencies"], inplace=True)
+    now = datetime.now()
+
+    report_output_directory = "/bil/data/inventory/daily/reports"
+    report_output_filename = (
+        f'{report_output_directory}/{str(now.strftime("%Y%m%d"))}.tsv'
+    )
+
+    command = f"rm -fv {symlink_file} & ln -s {report_output_filename} {symlink_file}"
+    print(command)
+    output = subprocess.check_output(command, shell=True)
+
+    symlink_file = f"{report_output_directory}/today.tsv"
+    if Path(symlink_file).exists():
+        Path(symlink_file).unlink()
+
+    df.to_csv(report_output_filename, sep="\t", index=False)
 
 print("Exporting dataframe to Excel spreadsheet")
 now = datetime.now()

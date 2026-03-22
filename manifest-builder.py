@@ -1,34 +1,68 @@
-import argparse
-import datetime
-import gzip
-import threading
-from numpyencoder import NumpyEncoder
-import hashlib
-import json
-import shutil
-import humanize
-import warnings
-import mimetypes
-import magic
-import os
-import os.path
 import sys
-import shutil
-import subprocess
-import time
-import uuid
-import warnings
-from pathlib import Path
-import hashlib
-from concurrent.futures import ProcessPoolExecutor
-import compress_json
-import numpy as np
+
+
+def safe_import(module_name):
+    try:
+        globals()[module_name] = __import__(module_name)
+    except ImportError as e:
+        print(
+            f"Error: Failed to import '{module_name}'. Please install the required package."
+        )
+        sys.exit(1)
+
+
+# List of modules to import
+modules = [
+    "random",
+    "xxhash",
+    "argparse",
+    "datetime",
+    "gzip",
+    "threading",
+    "numpyencoder",
+    "hashlib",
+    "json",
+    "shutil",
+    "humanize",
+    "warnings",
+    "mimetypes",
+    "magic",
+    "os",
+    "os.path",
+    "sys",
+    "shutil",
+    "subprocess",
+    "time",
+    "uuid",
+    "warnings",
+    "pathlib",
+    "hashlib",
+    "concurrent.futures",
+    "compress_json",
+    "tabulate",
+    "pandarallel",
+    "tqdm",
+    "zipfile",
+    "pymongo",
+]
+
+# Attempt to import each module safely
+for module in modules:
+    safe_import(module)
+
 import pandas as pd
-import tabulate
+import numpy as np
+
+# Explicit imports for modules that use submodules
+from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path
+from numpyencoder import NumpyEncoder
 from pandarallel import pandarallel
 from tqdm import tqdm
+from pymongo import MongoClient
 
 
+####################################################################################
 def pprint(msg):
     """
     Pretty-print the given message with horizontal lines above and below.
@@ -52,6 +86,7 @@ def pprint(msg):
     print(result)
 
 
+####################################################################################
 def __create_checkpoint_file(filename):
     """
     Creates a checkpoint file if it doesn't exist.
@@ -85,8 +120,10 @@ def __create_checkpoint_file(filename):
         return False
 
 
+####################################################################################
 def __remove_checkpoint_file(filename):
     # Create a Path object for the specified filename
+    print(f"Checking the existence of checkpoint file {filename}")
     file_path = Path(filename)
 
     # Check if the file exists
@@ -100,30 +137,89 @@ def __remove_checkpoint_file(filename):
         return False
 
 
+####################################################################################
 def __get_file_size(filename):
     return Path(filename).stat().st_size
 
 
+####################################################################################
 def __get_relative_path(full_path):
     answer = str(full_path).replace(f"{directory}/", "")
     return answer
 
 
+####################################################################################
 def __update_dataframe(dataset, temp, key):
     for index, datum in temp.iterrows():
         dataset.loc[index, key] = temp.loc[index, key]
     return dataset
 
 
+####################################################################################
 def __get_filename(filename):
     return Path(filename).stem + Path(filename).suffix
 
 
-def __compute_sha256sum(filename):
-    # BUF_SIZE is totally arbitrary, change for your app!
-    BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
+####################################################################################
+def __compute_xxh64sum(filename, file_extensions):
+    # Guard against NaN/None values in the filename column
+    if not isinstance(filename, str):
+        return None
 
+    # Check if the file extension is in the list to skip
+    if any(filename.endswith(ext) for ext in file_extensions):
+        return None
+
+    hasher = xxhash.xxh64()  # Choose the appropriate hash function (xxh32, xxh64, etc.)
+    BUFF_SIZE = 65536
+
+    try:
+        # Open the file in binary mode
+        with open(filename, "rb") as file:
+            for chunk in iter(lambda: file.read(BUFF_SIZE), b""):  # Read file in chunks
+                hasher.update(chunk)  # Update hash with each chunk
+
+        return hasher.hexdigest()  # Get the hexadecimal digest of the hash
+    except Exception as e:
+        # Print the filename and raise the exception
+        print(f"Error processing file: {filename}: {e}")
+        return None
+
+
+####################################################################################
+def __compute_b2sum(filename, file_extensions):
+    # Guard against NaN/None values in the filename column
+    if not isinstance(filename, str):
+        return None
+
+    # Check if the file extension is in the list to skip
+    if any(filename.endswith(ext) for ext in file_extensions):
+        return None
+
+    hash_blake2b = hashlib.blake2b()
+    buffer_size = 8192  # Read the file in chunks of 8KB
+
+    try:
+        if Path(filename).is_file() or Path(filename).is_symlink():
+            with open(filename, "rb") as f:
+                while chunk := f.read(buffer_size):
+                    hash_blake2b.update(chunk)
+
+        return hash_blake2b.hexdigest()
+    except Exception as e:
+        print(f"Unable to process {filename}: {e}")
+        return None
+
+
+####################################################################################
+def __compute_sha256sum(filename, file_extensions):
+    # Check if the file extension is in the list to skip
+    if any(filename.endswith(ext) for ext in file_extensions):
+        return None
+
+    BUF_SIZE = 65536  # Read in 64KB chunks
     sha256 = hashlib.sha256()
+
     if Path(filename).is_file() or Path(filename).is_symlink():
         with open(filename, "rb") as f:
             while True:
@@ -135,8 +231,13 @@ def __compute_sha256sum(filename):
     return sha256.hexdigest()
 
 
-def __compute_sha256sum_threaded(filename):
+####################################################################################
+def __compute_sha256sum_threaded(filename, file_extensions):
     BUF_SIZE = 65536
+
+    # Check if the file extension is in the list to skip
+    if any(filename.endswith(ext) for ext in file_extensions):
+        return None
 
     sha256 = hashlib.sha256()
 
@@ -161,6 +262,7 @@ def __compute_sha256sum_threaded(filename):
     return sha256.hexdigest()
 
 
+####################################################################################
 def __compute_md5sum_threaded(filename):
     BUF_SIZE = 65536
 
@@ -187,10 +289,13 @@ def __compute_md5sum_threaded(filename):
     return md5.hexdigest()
 
 
-def __compute_md5sum(filename):
-    # BUF_SIZE is totally arbitrary, change for your app!
-    BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
+####################################################################################
+def __compute_md5sum(filename, file_extensions):
+    # Check if the file extension is in the list to skip
+    if any(filename.endswith(ext) for ext in file_extensions):
+        return None
 
+    BUF_SIZE = 65536  # Read in 64KB chunks
     md5 = hashlib.md5()
 
     if Path(filename).is_file() or Path(filename).is_symlink():
@@ -204,12 +309,14 @@ def __compute_md5sum(filename):
     return md5.hexdigest()
 
 
+####################################################################################
 def __clean_directory(directory):
     if directory[-1] == "/":
         directory = directory[:-1]
     return directory
 
 
+####################################################################################
 def __get_chunk_size(dataframe):
     if len(dataframe) < 1000:
         return 10
@@ -223,6 +330,7 @@ def __get_chunk_size(dataframe):
         return 500
 
 
+####################################################################################
 def __generate_dataset_uuid(directory):
     if directory[-1] == "/":
         directory = directory[:-1]
@@ -230,6 +338,7 @@ def __generate_dataset_uuid(directory):
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, directory))
 
 
+####################################################################################
 def __get_directory_creation_date(directory):
     ti_c = os.path.getctime(directory)
     c_ti = time.ctime(ti_c)
@@ -237,6 +346,7 @@ def __get_directory_creation_date(directory):
     return c_ti
 
 
+####################################################################################
 def __get_files(directory):
     files = subprocess.check_output(["lfs", "find", "-type", "f", directory])
     files = str(files)
@@ -246,6 +356,7 @@ def __get_files(directory):
     return files
 
 
+####################################################################################
 def __get_file_extension(filename):
     if Path(filename).is_file() or Path(filename).is_symlink():
         extension = Path(filename).suffix
@@ -256,10 +367,12 @@ def __get_file_extension(filename):
     return extension
 
 
+####################################################################################
 def __get_number_of_files(directory):
     return len(__get_files(directory))
 
 
+####################################################################################
 def __get_mime_type(filename):
     answer = mimetypes.guess_type(filename)
     try:
@@ -268,6 +381,7 @@ def __get_mime_type(filename):
         return None
 
 
+####################################################################################
 def __get_filetype(extension):
     images = {
         ".tiff",
@@ -292,22 +406,24 @@ def __get_filetype(extension):
     return "other"
 
 
+####################################################################################
 def __get_url(filename):
     filename = str(filename)
     return filename.replace("/bil/data/", "https://download.brainimagelibrary.org/")
 
 
+####################################################################################
 def __get_file_creation_date(filename):
     t = os.path.getmtime(str(filename))
     return str(datetime.datetime.fromtimestamp(t))
 
-
-def __to_json(df, directory):
+####################################################################################
+def __to_json(df, bildid):
     df["fullpath"] = df["fullpath"].astype(str)
     files = df.to_dict("records")
     dataset["manifest"] = files
 
-    output_filename = "json/" + __generate_dataset_uuid(directory) + ".json"
+    output_filename = f"json/{bildid}.json"
     with open(output_filename, "w") as ofile:
         json.dump(
             dataset,
@@ -325,25 +441,186 @@ def __to_json(df, directory):
 
     print(f"Saving results to {output_filename}.")
 
-    if update_json_file_on_bil_data:
-        output_filename = (
-            f"/bil/data/inventory/{__generate_dataset_uuid(directory)}.json"
-        )
-        with open(output_filename, "w") as ofile:
-            json.dump(
-                dataset,
-                ofile,
-                indent=4,
-                sort_keys=True,
-                ensure_ascii=False,
-                cls=NumpyEncoder,
-            )
-
-    print(f"Updating file {output_filename}.")
-
     if compress_json_file_on_bil_data:
         with gzip.open(f"{output_filename}.gz", "wt") as f:
             f.write(str(dataset))
+
+
+#####################################################################################
+def __upload_to_mongodb(records, batch_size=500):
+    """
+    Upload file records to MongoDB localhost, collection 'files'.
+    Inserts new documents, updates changed ones, skips unchanged ones.
+    Processes records in batches to stay within MongoDB's 16MB BSON limit.
+
+    Parameters:
+    - records (list): List of file record dicts from the manifest.
+    - batch_size (int): Number of records per bulk-write batch (default 500).
+    """
+    from pymongo import UpdateOne
+    from pymongo.errors import BulkWriteError
+
+    try:
+        client = MongoClient("mongodb://localhost:27017/", serverSelectionTimeoutMS=5000)
+        client.server_info()  # raises if unreachable
+    except Exception as e:
+        print(f"Warning: Could not connect to MongoDB: {e}")
+        return
+
+    collection = client["bil"]["files"]
+    inserted = updated = skipped = errors = 0
+
+    for batch_start in range(0, len(records), batch_size):
+        batch = records[batch_start : batch_start + batch_size]
+
+        operations = []
+
+        for record in batch:
+            fullpath = record.get("fullpath")
+            if not fullpath:
+                continue
+
+            # Stable content hash — used to detect unchanged documents
+            record_hash = hashlib.md5(
+                json.dumps(record, sort_keys=True, default=str).encode()
+            ).hexdigest()
+
+            # Use only fullpath as the upsert key. The hash check goes in the
+            # update condition so that an unchanged document is not rewritten,
+            # but we never attempt to insert a duplicate fullpath.
+            operations.append(
+                UpdateOne(
+                    {"fullpath": fullpath},
+                    [
+                        {
+                            "$set": {
+                                **{k: v for k, v in record.items() if k != "fullpath"},
+                                "_content_hash": record_hash,
+                                "_updated": {
+                                    "$cond": [
+                                        {"$eq": ["$_content_hash", record_hash]},
+                                        "$_updated",
+                                        "$$NOW",
+                                    ]
+                                },
+                            }
+                        }
+                    ],
+                    upsert=True,
+                )
+            )
+
+        if not operations:
+            continue
+
+        try:
+            result = collection.bulk_write(operations, ordered=False)
+            inserted += result.upserted_count
+            updated += result.modified_count
+            skipped += len(operations) - result.upserted_count - result.modified_count
+        except BulkWriteError as e:
+            details = e.details
+            inserted += details.get("nUpserted", 0)
+            updated += details.get("nModified", 0)
+            errors += len(details.get("writeErrors", []))
+            skipped += len(operations) - details.get("nUpserted", 0) - details.get("nModified", 0) - len(details.get("writeErrors", []))
+        except Exception as e:
+            print(f"Warning: Bulk write error on batch starting at {batch_start}: {e}")
+            errors += len(operations)
+
+    print(
+        f"MongoDB upload complete: {inserted} inserted, {updated} updated, "
+        f"{skipped} skipped, {errors} errors."
+    )
+    client.close()
+
+
+#####################################################################################
+def __to_metadata(data, bildid):
+    """
+    Save dataset metadata to the local metadata directory as both plain JSON and
+    gzip-compressed JSON, then publish the compressed copy to the BIL inventory.
+
+    Writes two files to <cwd>/metadata/:
+      - {bildid}.json      — human-readable plain JSON
+      - {bildid}.json.gz   — gzip-compressed JSON (valid gunzip target)
+
+    The compressed file is also copied to /bil/data/inventory/datasets/JSON/ so
+    that the public inventory stays current after every run.
+
+    Finally, the manifest records embedded in `data` are upserted into MongoDB
+    (localhost) for downstream querying.
+
+    Parameters:
+    - data (dict): Dataset-level metadata dict, including a "manifest" key whose
+                   value is a list of per-file record dicts.
+    - bildid (str): BIL dataset identifier used as the output filename stem.
+    """
+    # Create the metadata output directory if it does not exist
+    zip_dir = Path.cwd() / "metadata"
+    zip_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write plain JSON — useful for direct inspection without decompression
+    output_filename = zip_dir / f"{bildid}.json"
+    with open(output_filename, "w") as temp_file:
+        json.dump(data, temp_file, indent=4)
+
+    print(f"Saved metadata TSV file as JSON to {output_filename}.")
+
+    # Write gzip-compressed JSON to the local metadata directory.
+    # Uses text mode ("wt") so json.dump can write directly without manual encoding.
+    gz_filename = zip_dir / f"{bildid}.json.gz"
+    with gzip.open(gz_filename, "wt", encoding="utf-8") as gz_file:
+        json.dump(data, gz_file, indent=4)
+
+    print(f"Saved gzip-compressed JSON to {gz_filename}.")
+
+    # Publish the compressed JSON to the shared BIL inventory directory so other
+    # tools and users always have access to the latest version.
+    bil_gz_dest = Path("/bil/data/inventory/datasets/JSON") / f"{bildid}.json.gz"
+    shutil.copy2(gz_filename, bil_gz_dest)
+    print(f"Copied gzip-compressed JSON to {bil_gz_dest}.")
+
+    records = data.get("manifest", [])
+    if records:
+        __upload_to_mongodb(records)
+    else:
+        pass
+
+
+#####################################################################################
+def __to_zip(df, bildid, directory):
+    """
+    Save a DataFrame to a ZIP file containing a TSV file.
+
+    Parameters:
+    - df (pd.DataFrame): The DataFrame to save.
+    - bildid (str): Identifier for the ZIP and TSV files.
+    - directory (str): Base directory where the ZIP files are stored.
+    """
+    # Ensure "fullpath" column is of string type
+    df["fullpath"] = df["fullpath"].astype(str)
+
+    # Create the "zip" directory if it does not exist
+    zip_dir = Path.cwd() / "zip"
+    zip_dir.mkdir(parents=True, exist_ok=True)
+
+    # Define temporary TSV filename and ZIP file paths
+    temp_filename = zip_dir / f"{bildid}.tsv"
+    output_filename = zip_dir / f"{bildid}.zip"
+
+    # Save the DataFrame as a TSV file
+    df.to_csv(temp_filename, sep="\t", index=False)
+    print(f"Saved temporary TSV file to {temp_filename}.")
+
+    # Compress the TSV file into a ZIP archive
+    with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
+        zipf.write(temp_filename, arcname=f"{bildid}.tsv")
+    print(f"Saved ZIP file to {output_filename}.")
+
+    # Clean up the temporary TSV file
+    # temp_filename.unlink()
+    # print(f"Deleted temporary TSV file: {temp_filename}.")
 
 
 ###############################################################################################################
@@ -358,6 +635,42 @@ parser.add_argument(
 )
 parser.add_argument(
     "--compress", action=argparse.BooleanOptionalAction, dest="compress", default=False
+)
+
+parser.add_argument(
+    "--ignore-md5sum",
+    action=argparse.BooleanOptionalAction,
+    dest="ignore_md5",
+    default=False,
+)
+
+parser.add_argument(
+    "--ignore-sha256sum",
+    action=argparse.BooleanOptionalAction,
+    dest="ignore_sha256",
+    default=False,
+)
+
+parser.add_argument(
+    "--ignore-xxh64sum",
+    action=argparse.BooleanOptionalAction,
+    dest="ignore_xxh64",
+    default=False,
+)
+
+parser.add_argument(
+    "--ignore-b2sum",
+    action=argparse.BooleanOptionalAction,
+    dest="ignore_b2sum",
+    default=False,
+)
+
+
+parser.add_argument(
+    "--remove-checkpoints",
+    action=argparse.BooleanOptionalAction,
+    dest="remove_checkpoints",
+    default=False,
 )
 parser.add_argument(
     "--rebuild", action=argparse.BooleanOptionalAction, dest="rebuild", default=False
@@ -379,9 +692,14 @@ directory = args.directory
 update_json_file_on_bil_data = bool(args.update)
 compress_json_file_on_bil_data = bool(args.compress)
 avoid_checksums = bool(args.avoid_checksums)
+remove_checkpoints = bool(args.remove_checkpoints)
 multi_threading = bool(args.multi_threading)
 rebuild = bool(args.rebuild)
 ncores = int(args.ncores)
+ignore_md5sum = bool(args.ignore_md5)
+ignore_sha256sum = bool(args.ignore_sha256)
+ignore_xxh64sum = bool(args.ignore_xxh64)
+ignore_b2sum = bool(args.ignore_b2sum)
 pandarallel.initialize(progress_bar=True, nb_workers=ncores)
 
 if directory[-1] == "/":
@@ -396,28 +714,82 @@ if not Path("json").exists():
 file = directory.replace("/", "_")
 output_filename = f".data/{file}.tsv"
 
+_bildid = None
+_local_meta = "summary_metadata.tsv"
+if Path(_local_meta).exists():
+    _meta_df = pd.read_csv(_local_meta, sep="\t")
+    _meta_df["bildirectory"] = _meta_df["bildirectory"].apply(__clean_directory)
+    _meta_match = _meta_df[_meta_df["bildirectory"] == directory]
+    if not _meta_match.empty:
+        _bildid = _meta_match["bildid"].values[0]
+
+if _bildid:
+    pprint(f"Processing dataset {_bildid} in {directory}")
+else:
+    pprint(f"Processing dataset in {directory}")
+
+file_extensions = ["ims"]
+print(f"Ignoring files with extensions {file_extensions}")
+
+# if done file exists, then do not process dataset
+done = output_filename.replace(".tsv", ".done")
+if Path(done).exists():
+    if remove_checkpoints:
+        print("Removing checkpoints.")
+        Path(done).unlink()
+    else:
+        print("The processing of this dataset is finished.")
+        # Even though the dataset inventory is complete, always regenerate the
+        # gzip-compressed JSON and push it to the BIL inventory directory.
+        # This ensures the published .json.gz is never stale (e.g. after a
+        # manual edit to the plain JSON or a first run that predates gz output).
+        local_file = "summary_metadata.tsv"
+        if Path(local_file).exists():
+            _meta = pd.read_csv(local_file, sep="\t")
+            _meta["bildirectory"] = _meta["bildirectory"].apply(__clean_directory)
+            _match = _meta[_meta["bildirectory"] == directory]
+            if not _match.empty:
+                _bildid = _match["bildid"].values[0]
+                _json_file = Path("metadata") / f"{_bildid}.json"
+                if _json_file.exists():
+                    # Re-compress the existing plain JSON into a fresh .json.gz
+                    _gz_file = Path("metadata") / f"{_bildid}.json.gz"
+                    with open(_json_file) as _f:
+                        _data = json.load(_f)
+                    with gzip.open(_gz_file, "wt", encoding="utf-8") as _gf:
+                        json.dump(_data, _gf, indent=4)
+                    print(f"Updated gzip-compressed JSON to {_gz_file}.")
+                    # Copy the updated gz to the shared BIL inventory directory
+                    _bil_gz_dest = Path("/bil/data/inventory/datasets/JSON") / f"{_bildid}.json.gz"
+                    shutil.copy2(_gz_file, _bil_gz_dest)
+                    print(f"Copied gzip-compressed JSON to {_bil_gz_dest}.")
+        sys.exit()
+
+# if checkpoint file exists, then do not process dataset
 checkpoint = output_filename.replace(".tsv", ".computing")
 if not __create_checkpoint_file(checkpoint):
     print("Another process is building an inventory for this dataset. Exiting.")
     sys.exit()
 
-done = output_filename.replace(".tsv", ".done")
-if Path(done).exists():
-    print("The processing of this dataset is finished. Exiting.")
-    sys.exit()
-
+# if this option is selected, then rebuild dataset
 if rebuild:
     if Path(output_filename).exists() or Path(output_filename).is_symlink():
         print("Rebuilding dataframe. Removing existing TSV file.")
         Path(output_filename).unlink()
 
+# if scratch exists, then use it. else use /local or /tmp
 temp_directory = "/scratch/icaoberg/"
 if not Path(temp_directory).exists():
-    temp_directory = "/tmp/"
+    if Path("/local/").exists():
+        temp_directory = "/local/"
+    else:
+        temp_directory = "/tmp/"
 
+# if there exists a temp file with pre-processed stats, then reuse it
 if Path(temp_directory + output_filename).exists():
     shutil.copyfile(temp_directory + output_filename, output_filename)
 
+# finding all the files in the directory
 if Path(output_filename).exists():
     print(f"Found temporary file {output_filename}. Loading local file.")
     df = pd.read_csv(output_filename, sep="\t", low_memory=False)
@@ -429,86 +801,106 @@ else:
 
 df.to_csv(output_filename, sep="\t", index=False)
 
-pprint(f"Processing dataset in {directory}")
-
+# if directory is empty, then do not process dataset
 if df.empty:
     print(f"No files found in {directory}. Exiting program.")
     sys.exit()
 
 ###############################################################################################################
 pprint("Get file extensions")
-if "extension" not in df.keys():
-    print("Computing file extension")
-    df["extension"] = df["fullpath"].parallel_apply(__get_file_extension)
+if "extension" not in df.keys() or df["extension"].isnull().any():
+    missing = df[df["extension"].isnull()] if "extension" in df.keys() else df
+    print(f"Computing file extension for {len(missing)} rows.")
+    df.loc[missing.index, "extension"] = missing["fullpath"].parallel_apply(__get_file_extension)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get filename")
-if "filename" not in df.keys():
-    df["filename"] = df["fullpath"].parallel_apply(__get_filename)
+if "filename" not in df.keys() or df["filename"].isnull().any():
+    missing = df[df["filename"].isnull()] if "filename" in df.keys() else df
+    print(f"Computing filename for {len(missing)} rows.")
+    df.loc[missing.index, "filename"] = missing["fullpath"].parallel_apply(__get_filename)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get relative path")
-if "relativepath" not in df.keys():
-    print("Computing relative paths")
-    df["relativepath"] = df["fullpath"].parallel_apply(__get_relative_path)
+if "relativepath" not in df.keys() or df["relativepath"].isnull().any():
+    missing = df[df["relativepath"].isnull()] if "relativepath" in df.keys() else df
+    print(f"Computing relative paths for {len(missing)} rows.")
+    df.loc[missing.index, "relativepath"] = missing["fullpath"].parallel_apply(__get_relative_path)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get file type")
-if "filetype" not in df.keys():
-    print("Computing file type")
-    df["filetype"] = df["extension"].parallel_apply(__get_filetype)
+if "filetype" not in df.keys() or df["filetype"].isnull().any():
+    missing = df[df["filetype"].isnull()] if "filetype" in df.keys() else df
+    print(f"Computing file type for {len(missing)} rows.")
+    df.loc[missing.index, "filetype"] = missing["extension"].parallel_apply(__get_filetype)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get file creation date")
-if "modification_time" not in df.keys():
-    print("Computing modification time")
-    df["modification_time"] = df["fullpath"].parallel_apply(__get_file_creation_date)
+if "modification_time" not in df.keys() or df["modification_time"].isnull().any():
+    missing = df[df["modification_time"].isnull()] if "modification_time" in df.keys() else df
+    print(f"Computing modification time for {len(missing)} rows.")
+    df.loc[missing.index, "modification_time"] = missing["fullpath"].parallel_apply(__get_file_creation_date)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get file size")
-if "size" not in df.keys():
-    print("Computing file size")
-    df["size"] = df["fullpath"].parallel_apply(__get_file_size)
+if "size" not in df.keys() or df["size"].isnull().any():
+    missing = df[df["size"].isnull()] if "size" in df.keys() else df
+    print(f"Computing file size for {len(missing)} rows.")
+    df.loc[missing.index, "size"] = missing["fullpath"].parallel_apply(__get_file_size)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get mime-type")
-if "mime-type" not in df.keys():
-    print("Computing mime-type")
-    df["mime-type"] = df["fullpath"].parallel_apply(__get_mime_type)
+if "mime-type" not in df.keys() or df["mime-type"].isnull().any():
+    missing = df[df["mime-type"].isnull()] if "mime-type" in df.keys() else df
+    print(f"Computing mime-type for {len(missing)} rows.")
+    df["mime-type"] = df["mime-type"].astype(object)
+    df.loc[missing.index, "mime-type"] = missing["fullpath"].parallel_apply(__get_mime_type)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
 
 ###############################################################################################################
 pprint("Get download link for each file")
-if "download_url" not in df.keys():
-    print("Computing download URL")
-    df["download_url"] = df["fullpath"].parallel_apply(__get_url)
+if "download_url" not in df.keys() or df["download_url"].isnull().any():
+    missing = df[df["download_url"].isnull()] if "download_url" in df.keys() else df
+    print(f"Computing download URL for {len(missing)} rows.")
+    df.loc[missing.index, "download_url"] = missing["fullpath"].parallel_apply(__get_url)
     df.to_csv(output_filename, sep="\t", index=False)
 else:
     print("No files left to process.")
 
 ###############################################################################################################
+pprint("Find cell_by_gene")
+if "is_cell_by_gene" not in df.keys() or df["is_cell_by_gene"].isnull().any():
+    missing = df[df["is_cell_by_gene"].isnull()] if "is_cell_by_gene" in df.keys() else df
+    print(f"Computing is_cell_by_gene for {len(missing)} rows.")
+    df.loc[missing.index, "is_cell_by_gene"] = missing["filename"].str.startswith("cell_by_gene", na=False)
+    df.to_csv(output_filename, sep="\t", index=False)
+    print("Finished computing values.")
+else:
+    print("No files left to process.")
+
+###############################################################################################################
 warnings.filterwarnings("ignore")
-if not avoid_checksums:
+if not avoid_checksums or ignore_md5sum:
     pprint("Computing MD5 checksum")
 
     if len(df) < 100:
@@ -516,7 +908,7 @@ if not avoid_checksums:
             files = df[df["md5"].isnull()]
         else:
             files = df
-        print(f"Number of files to process is {str(len(files))}")
+        print(f"Number of files to process is {str(len(files))}.")
 
         if len(files) > 0:
             if multi_threading:
@@ -524,7 +916,9 @@ if not avoid_checksums:
                     __compute_md5sum_threaded
                 )
             else:
-                files["md5"] = files["fullpath"].parallel_apply(__compute_md5sum)
+                files["md5"] = files["fullpath"].parallel_apply(
+                    lambda x: __compute_md5sum(x, file_extensions)
+                )
 
             df = __update_dataframe(df, files, "md5")
             df.to_csv(output_filename, sep="\t", index=False)
@@ -536,14 +930,16 @@ if not avoid_checksums:
 
         if len(files) != 0:
             n = __get_chunk_size(files)
-            print(f"Number of files to process is {str(len(files))}")
+            print(f"Number of files to process is {str(len(files))}.")
             if n < 25:
                 if multi_threading:
                     files["md5"] = files["fullpath"].parallel_apply(
                         __compute_md5sum_threaded
                     )
                 else:
-                    files["md5"] = files["fullpath"].parallel_apply(__compute_md5sum)
+                    files["md5"] = files["fullpath"].parallel_apply(
+                        lambda x: __compute_md5sum(x, file_extensions)
+                    )
 
                 df = __update_dataframe(df, files, "md5")
                 df.to_csv(output_filename, sep="\t", index=False)
@@ -560,22 +956,136 @@ if not avoid_checksums:
                         )
                     else:
                         chunk["md5"] = chunk["fullpath"].parallel_apply(
-                            __compute_md5sum
+                            lambda x: __compute_md5sum(x, file_extensions)
                         )
 
                     df = __update_dataframe(df, chunk, "md5")
-                    chunk_counter = chunk_counter + 1
 
                     if chunk_counter % 10 == 0 or chunk_counter == len(chunks):
                         print("\nSaving chunks to disk")
                         df.to_csv(output_filename, sep="\t", index=False)
+                    chunk_counter = chunk_counter + 1
         else:
             print("No files left to process.")
 
     df.to_csv(output_filename, sep="\t", index=False)
 
 ###############################################################################################################
-if not avoid_checksums:
+warnings.filterwarnings("ignore")
+if not avoid_checksums or ignore_xxh64sum:
+    pprint("Computing xxh64 checksum")
+
+    if len(df) < 100:
+        if "xxh64" in df.keys():
+            files = df[df["xxh64"].isnull()]
+        else:
+            files = df
+        print(f"Number of files to process is {str(len(files))}.")
+
+        if len(files) > 0:
+            files["xxh64"] = files["fullpath"].parallel_apply(
+                lambda x: __compute_xxh64sum(x, file_extensions)
+            )
+
+            df = __update_dataframe(df, files, "xxh64")
+            df.to_csv(output_filename, sep="\t", index=False)
+    else:
+        if "xxh64" in df.keys():
+            files = df[df["xxh64"].isnull()]
+        else:
+            files = df
+
+        if len(files) != 0:
+            n = __get_chunk_size(files)
+            print(f"Number of files to process is {str(len(files))}.")
+            if n < 25:
+                files["xxh64"] = files["fullpath"].parallel_apply(
+                    lambda x: __compute_xxh64sum(x, file_extensions)
+                )
+
+                df = __update_dataframe(df, files, "xxh64")
+                df.to_csv(output_filename, sep="\t", index=False)
+            else:
+                chunks = np.array_split(files, n)
+                chunk_counter = 1
+                for chunk in chunks:
+                    print(
+                        f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}"
+                    )
+                    chunk["xxh64"] = chunk["fullpath"].parallel_apply(
+                        lambda x: __compute_xxh64sum(x, file_extensions)
+                    )
+
+                    df = __update_dataframe(df, chunk, "xxh64")
+
+                    if chunk_counter % 10 == 0 or chunk_counter == len(chunks):
+                        print("\nSaving chunks to disk")
+                        df.to_csv(output_filename, sep="\t", index=False)
+                    chunk_counter = chunk_counter + 1
+        else:
+            print("No files left to process.")
+
+    df.to_csv(output_filename, sep="\t", index=False)
+
+###############################################################################################################
+warnings.filterwarnings("ignore")
+if not avoid_checksums or ignore_b2sum:
+    pprint("Computing b2sum checksum")
+
+    if len(df) < 100:
+        if "b2sum" in df.keys():
+            files = df[df["b2sum"].isnull()]
+        else:
+            files = df
+        print(f"Number of files to process is {str(len(files))}.")
+
+        if len(files) > 0:
+            files["b2sum"] = files["fullpath"].parallel_apply(
+                lambda x: __compute_b2sum(x, file_extensions)
+            )
+
+            df = __update_dataframe(df, files, "b2sum")
+            df.to_csv(output_filename, sep="\t", index=False)
+    else:
+        if "b2sum" in df.keys():
+            files = df[df["b2sum"].isnull()]
+        else:
+            files = df
+
+        if len(files) != 0:
+            n = __get_chunk_size(files)
+            print(f"Number of files to process is {str(len(files))}.")
+            if n < 25:
+                files["b2sum"] = files["fullpath"].parallel_apply(
+                    lambda x: __compute_b2sum(x, file_extensions)
+                )
+
+                df = __update_dataframe(df, files, "b2sum")
+                df.to_csv(output_filename, sep="\t", index=False)
+            else:
+                chunks = np.array_split(files, n)
+                chunk_counter = 1
+                for chunk in chunks:
+                    print(
+                        f"\nProcessing chunk {str(chunk_counter)} of {str(len(chunks))}"
+                    )
+                    chunk["b2sum"] = chunk["fullpath"].parallel_apply(
+                        lambda x: __compute_b2sum(x, file_extensions)
+                    )
+
+                    df = __update_dataframe(df, chunk, "b2sum")
+
+                    if chunk_counter % 10 == 0 or chunk_counter == len(chunks):
+                        print("\nSaving chunks to disk")
+                        df.to_csv(output_filename, sep="\t", index=False)
+                    chunk_counter = chunk_counter + 1
+        else:
+            print("No files left to process.")
+
+    df.to_csv(output_filename, sep="\t", index=False)
+
+###############################################################################################################
+if not avoid_checksums or ignore_sha256sum:
     pprint("Computing SHA256 checksum")
 
     if len(df) < 100:
@@ -583,7 +1093,7 @@ if not avoid_checksums:
             files = df[df["sha256"].isnull()]
         else:
             files = df
-        print(f"Number of files to process is {str(len(files))}")
+        print(f"Number of files to process is {str(len(files))}.")
 
         if len(files) > 0:
             if multi_threading:
@@ -591,7 +1101,9 @@ if not avoid_checksums:
                     __compute_sha256sum_threaded
                 )
             else:
-                files["sha256"] = files["fullpath"].parallel_apply(__compute_sha256sum)
+                files["sha256"] = files["fullpath"].parallel_apply(
+                    lambda x: __compute_sha256sum(x, file_extensions)
+                )
 
             df = __update_dataframe(df, files, "sha256")
             df.to_csv(output_filename, sep="\t", index=False)
@@ -603,7 +1115,7 @@ if not avoid_checksums:
 
         if not files.empty:
             n = __get_chunk_size(files)
-            print(f"Number of files to process is {str(len(files))}")
+            print(f"Number of files to process is {str(len(files))}.")
 
             if n < 25:
                 if multi_threading:
@@ -612,7 +1124,7 @@ if not avoid_checksums:
                     )
                 else:
                     files["sha256"] = files["fullpath"].parallel_apply(
-                        __compute_sha256sum
+                        lambda x: __compute_sha256sum(x, file_extensions)
                     )
 
                 df = __update_dataframe(df, files, "sha256")
@@ -631,15 +1143,15 @@ if not avoid_checksums:
                         )
                     else:
                         chunk["sha256"] = chunk["fullpath"].parallel_apply(
-                            __compute_sha256sum
+                            lambda x: __compute_sha256sum(x, file_extensions)
                         )
 
                     df = __update_dataframe(df, chunk, "sha256")
-                    chunk_counter = chunk_counter + 1
 
                     if chunk_counter % 10 == 0 or chunk_counter == len(chunks):
                         print("\nSaving chunks to disk")
                         df.to_csv(output_filename, sep="\t", index=False)
+                    chunk_counter = chunk_counter + 1
         else:
             print("No files left to process.")
 
@@ -653,8 +1165,8 @@ dataset["dataset_uuid"] = __generate_dataset_uuid(directory)
 dataset["creation_date"] = __get_directory_creation_date(directory)
 dataset["directory"] = directory
 dataset["download_url"] = __get_url(dataset["directory"])
-dataset["number_of_files"] = len(df)
-dataset["size"] = df["size"].sum()
+dataset["number_of_files"] = int(len(df))
+dataset["size"] = int(df["size"].sum())
 dataset["pretty_size"] = humanize.naturalsize(dataset["size"], gnu=True)
 dataset["frequencies"] = df["extension"].value_counts().to_dict()
 dataset["file_types"] = df["filetype"].value_counts().to_dict()
@@ -672,11 +1184,11 @@ if not metadata[metadata["bildirectory"] == directory].empty:
     ].values[0]
 
     dataset["contributor_name"] = metadata[metadata["bildirectory"] == directory][
-        "contributorname"
+        "contributor"
     ].values[0]
 
-    dataset["affiliation"] = metadata[metadata["bildirectory"] == directory][
-        "affiliation"
+    dataset["bildid"] = metadata[metadata["bildirectory"] == directory][
+        "bildid"
     ].values[0]
 
     dataset["award_number"] = metadata[metadata["bildirectory"] == directory][
@@ -692,15 +1204,15 @@ if not metadata[metadata["bildirectory"] == directory].empty:
     ].values[0]
 
     dataset["taxonomy"] = metadata[metadata["bildirectory"] == directory][
-        "ncbitaxonomy"
+        "taxonomy"
     ].values[0]
 
     dataset["technique"] = metadata[metadata["bildirectory"] == directory][
         "technique"
     ].values[0]
 
-__to_json(df, directory)
-
+__to_json(df, dataset["bildid"])
+__to_metadata(dataset, dataset["bildid"])
+__to_zip(df, dataset["bildid"], directory)
 __remove_checkpoint_file(checkpoint)
 __create_checkpoint_file(done)
-print("Done.\n")

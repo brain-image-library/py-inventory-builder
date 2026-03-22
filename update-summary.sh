@@ -1,4 +1,22 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Author: Ivan Cao-Berg <icaoberg@andrew.cmu.edu>
+#
+# Copyright (C) 2026 Ivan Cao-Berg
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SLURM submission header (effective when submitted with `sbatch`).
 # Safe to ignore if launched directly by cron; the script still works.
@@ -110,25 +128,28 @@ apply_json_fixes() {
     # Fix specific name with trailing space
     (.. | strings) |= gsub("Allen Institute for Brain Science "; "Allen Institute for Brain Science")
     |
-    # Ensure "award_number" is set to "Unavailable" when null or missing
-    if has("award_number") then
-      .award_number = (if .award_number == null or .award_number == "" then "Unavailable" else .award_number end)
-    else
-      . + {award_number: "Unavailable"}
-    end
-    |
-    # Normalize species capitalization if field exists
-    (if has("species") then
-       .species |= (
-          if . == "Mouse" then "mouse"
-          elif . == "Human" then "human"
-          elif . == "Marmoset" then "marmoset"
-          elif . == "other" then "Other"
-          else .
-          end
-       )
-     else .
-     end)
+    # Apply per-object fixes to each element in the top-level array
+    map(
+      # Ensure "award_number" is set to "Unavailable" when null or missing
+      if has("award_number") then
+        .award_number = (if .award_number == null or .award_number == "" then "Unavailable" else .award_number end)
+      else
+        . + {award_number: "Unavailable"}
+      end
+      |
+      # Normalize species capitalization if field exists
+      (if has("species") then
+         .species |= (
+            if . == "Mouse" then "mouse"
+            elif . == "Human" then "human"
+            elif . == "Marmoset" then "marmoset"
+            elif . == "other" then "Other"
+            else .
+            end
+         )
+       else .
+       end)
+    )
   ' "${TODAY_JSON}" > "${tmpfile}"
 
   mv -f "${tmpfile}" "${TODAY_JSON}"
@@ -168,7 +189,6 @@ main() {
   run_py "update-summary.py"
   run_py "update-statistics.py"
   run_py "compute_score.py"
-  run_py "convert_to_json.py"
   # run_py "update-missing-fields.py"   # enable when ready
 
   apply_json_fixes

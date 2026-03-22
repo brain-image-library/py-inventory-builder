@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 import json
 import traceback
+import sqlite3
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -298,7 +299,7 @@ def __get_json_file(directory):
         str or None: The JSON file path, or None if the file does not exist.
     """
     dataset_uuid = generate_dataset_uuid(directory)
-    output_filename = f"/bil/data/inventory/{dataset_uuid}.json"
+    output_filename = f"/bil/data/inventory/datasets/JSON{dataset_uuid}.json"
 
     if Path(output_filename).exists():
         return output_filename
@@ -450,7 +451,7 @@ df["exists"] = df["bildirectory"].parallel_apply(exists)
 print("\nComputing json file filename")
 df["json_file"] = df["bildirectory"].parallel_apply(__get_json_file)
 
-df = df[df["exists"] == True]
+df = df[df["exists"] == True].copy()
 
 print("\nGet data from JSON file")
 for index, row in tqdm(df.iterrows()):
@@ -468,7 +469,7 @@ df["number_of_files"] = None
 # df["frequencies"] = str(df["json_file"].parallel_apply(__get_frequencies))
 # df["mimetypes"] = str(df["json_file"].parallel_apply(__get_mime_types))
 
-df["temp_file"] = str(df["bildirectory"].parallel_apply(__get_temp_file))
+df["temp_file"] = df["bildirectory"].parallel_apply(__get_temp_file)
 
 df["file_types"] = None
 df["frequencies"] = None
@@ -493,7 +494,44 @@ df["xxh64_coverage"] = None
 df["score"] = None
 
 print("Saving dataframe to disk")
+if "bildid" in df.columns:
+    df = df.sort_values("bildid", na_position="last").reset_index(drop=True)
 df.to_csv("summary_metadata.tsv", sep="\t", index=False)
+
+db_path = Path("summary_metadata.sql")
+if not db_path.exists():
+    print("Saving dataframe to SQLite database")
+    with sqlite3.connect(db_path) as conn:
+        df.to_sql("summary_metadata", conn, if_exists="replace", index=False)
+
+print("Updating database.sql with new rows")
+db_path = Path("database.sql")
+with sqlite3.connect(db_path) as conn:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS summary_metadata (
+            bildirectory TEXT PRIMARY KEY
+        )
+    """)
+    existing = pd.read_sql("SELECT bildirectory FROM summary_metadata", conn)
+    existing_dirs = set(existing["bildirectory"].dropna())
+    new_rows = df[~df["bildirectory"].isin(existing_dirs)]
+    if not new_rows.empty:
+        # Add any columns not yet in the table
+        cursor = conn.execute("PRAGMA table_info(summary_metadata)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+        for col in new_rows.columns:
+            if col not in existing_cols:
+                conn.execute(f'ALTER TABLE summary_metadata ADD COLUMN "{col}" TEXT')
+        cols = ", ".join(f'"{c}"' for c in new_rows.columns)
+        placeholders = ", ".join("?" for _ in new_rows.columns)
+        conn.executemany(
+            f'INSERT OR IGNORE INTO summary_metadata ({cols}) VALUES ({placeholders})',
+            new_rows.itertuples(index=False, name=None)
+        )
+        conn.commit()
+        print(f"Inserted {len(new_rows)} new rows into database.sql")
+    else:
+        print("No new rows to insert into database.sql")
 
 # saves to public directory
 if not sample and Path("/bil/data/inventory").exists():

@@ -165,8 +165,8 @@ for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing metadata"):
                     df.at[idx, "b2sum_coverage"] = None
 
             # frequencies
-            print('Computing frequencies')
-            df.at[idx, "frequencies"] = (
+            import json as _json
+            df.at[idx, "frequencies"] = _json.dumps(
                 temp_df["extension"]
                 .dropna()
                 .value_counts()
@@ -175,8 +175,7 @@ for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing metadata"):
             )
 
             # filetype
-            print('Computing file types')
-            df.at[idx, "file_types"] = (
+            df.at[idx, "file_types"] = _json.dumps(
                 temp_df["filetype"]
                 .dropna()
                 .value_counts()
@@ -185,8 +184,7 @@ for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing metadata"):
             )
 
             # mime-types
-            print('Computing mime-types')
-            df.at[idx, "mime-types"] = (
+            df.at[idx, "mime-types"] = _json.dumps(
                 temp_df["mime-type"]
                 .dropna()
                 .value_counts()
